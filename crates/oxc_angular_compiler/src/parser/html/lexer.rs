@@ -1360,8 +1360,9 @@ impl<'a> HtmlLexer<'a> {
                 break;
             }
 
-            // EOF or tag start ends the value
-            if ch == chars::EOF || ch == '<' {
+            // EOF ends the value. A `<` does not (`@let a = b < c;`): like Angular's
+            // `_consumeLetDeclarationValue`, only a semicolon outside quotes ends it.
+            if ch == chars::EOF {
                 break;
             }
 

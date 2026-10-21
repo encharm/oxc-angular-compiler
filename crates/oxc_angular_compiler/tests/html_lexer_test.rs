@@ -1676,6 +1676,36 @@ mod let_declarations {
     }
 
     #[test]
+    fn should_parse_let_declaration_with_less_than_in_its_value() {
+        // Angular's `_consumeLetDeclarationValue` ends the value only at a `;`
+        // outside quotes (or EOF): a `<` is a comparison, not a tag
+        let result = tokenize_and_humanize_parts("@let small = count < 10;");
+        assert_eq!(
+            result,
+            vec![
+                (HtmlTokenType::LetStart, vec!["small".to_string()]),
+                (HtmlTokenType::LetValue, vec!["count < 10".to_string()]),
+                (HtmlTokenType::LetEnd, vec![]),
+                (HtmlTokenType::Eof, vec![]),
+            ]
+        );
+    }
+
+    #[test]
+    fn should_parse_let_declaration_with_comparisons_followed_by_an_element() {
+        let result = tokenize_and_humanize_parts("@let both = a < b && b < c;<span></span>");
+        assert_eq!(
+            result[..3],
+            [
+                (HtmlTokenType::LetStart, vec!["both".to_string()]),
+                (HtmlTokenType::LetValue, vec!["a < b && b < c".to_string()]),
+                (HtmlTokenType::LetEnd, vec![]),
+            ]
+        );
+        assert_eq!(result[3].0, HtmlTokenType::TagOpenStart);
+    }
+
+    #[test]
     fn should_report_incomplete_let_without_equals_after_name() {
         // No upstream spec case; Angular's _consumeLetDeclaration marks the
         // start token INCOMPLETE_LET whenever the `=` is missing after a name.
