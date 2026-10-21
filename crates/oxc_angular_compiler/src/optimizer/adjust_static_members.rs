@@ -42,9 +42,11 @@
 //! - `propDecorators` - Property decorators metadata
 
 use oxc_ast::ast::{
-    AssignmentTarget, BindingPattern, Expression, Program, Statement, VariableDeclarationKind,
+    AssignmentTarget, BindingPattern, Class, ClassElement, Declaration, Expression, ObjectPropertyKind,
+    Program, PropertyKey, PropertyKind, Statement, VariableDeclarationKind,
 };
-use oxc_span::Span;
+use oxc_span::{GetSpan, Span};
+use rustc_hash::FxHashSet;
 
 use super::Edit;
 
@@ -71,6 +73,30 @@ const ANGULAR_STATICS_TO_ELIDE: &[&str] = &[
 /// Transformer that wraps Angular classes and their static members in pure IIFEs.
 pub struct AdjustStaticMembersTransformer;
 
+/// How a class is declared at the top level
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DeclarationKind {
+    /// `let X = class X {}` (or const/var): wrapped as `<keyword> X = (() => { let X = class X {}; …; return X; })()`
+    Variable(&'static str),
+    /// `class X {}`, or `export class X {}`: wrapped as `[export] let X = (() => { class X {} …; return X; })()`
+    Declaration,
+}
+
+/// A class declaration and the static member assignments that follow it.
+struct ClassGroup<'a> {
+    class_name: &'a str,
+    kind: DeclarationKind,
+    class: &'a Class<'a>,
+    /// Where the wrapper starts: the statement for a variable, the class itself for a (possibly exported) declaration
+    start: u32,
+    /// Spans of the Angular static member assignments that follow the class.
+    static_members: Vec<Span>,
+    /// End of the last statement in this group.
+    end: u32,
+    /// A later statement assigns a member of the class with possible side effects: wrapping would not let it go
+    side_effects: bool,
+}
+
 impl AdjustStaticMembersTransformer {
     /// Create a new static members transformer.
     pub fn new() -> Self {
@@ -79,259 +105,264 @@ impl AdjustStaticMembersTransformer {
 
     /// Transform the program by collecting edits to wrap classes.
     pub fn transform(&self, program: &Program<'_>, source: &str) -> Vec<Edit> {
+        let bindings = top_level_bindings(program);
         let mut edits = Vec::new();
-
-        // Collect class declarations and their static member assignments
-        let class_groups = self.find_class_groups(program, source);
-
-        for group in class_groups {
-            if let Some(edit_group) = self.wrap_class_group(&group, source) {
-                edits.extend(edit_group);
+        for group in self.find_class_groups(program, &bindings, source) {
+            if group.side_effects {
+                continue;
+            }
+            // Like the Angular CLI's adjust-static-class-members: downleveled Angular statics after the class, or
+            // static members inside it that are all safe to wrap
+            let wrap = !group.static_members.is_empty() || class_static_members_wrappable(group.class, &bindings, source);
+            if wrap {
+                edits.extend(self.wrap_class_group(&group, source));
             }
         }
-
         edits
     }
 
     /// Find groups of class declarations with their subsequent static member assignments.
-    fn find_class_groups<'a>(
-        &self,
-        program: &'a Program<'a>,
-        _source: &str,
-    ) -> Vec<ClassGroup<'a>> {
-        let mut groups = Vec::new();
-        let mut current_group: Option<ClassGroup<'a>> = None;
-        let statements = &program.body;
+    fn find_class_groups<'a>(&self, program: &'a Program<'a>, bindings: &FxHashSet<&str>, source: &str) -> Vec<ClassGroup<'a>> {
+        let mut groups: Vec<ClassGroup<'a>> = Vec::new();
+        let mut current: Option<ClassGroup<'a>> = None;
 
-        for (i, stmt) in statements.iter().enumerate() {
-            // Check if this is a class declaration (let/const/var X = class X {})
-            if let Some((class_name, is_let, stmt_span)) = self.get_class_declaration_info(stmt) {
-                // Finalize previous group if any
-                if let Some(group) = current_group.take() {
-                    if !group.static_members.is_empty() {
-                        groups.push(group);
-                    }
+        for stmt in &program.body {
+            if let Some(group) = self.get_class_declaration_info(stmt) {
+                if let Some(done) = current.take() {
+                    groups.push(done);
                 }
-
-                // Start a new group
-                current_group = Some(ClassGroup {
-                    class_name,
-                    class_stmt_index: i,
-                    class_stmt_span: stmt_span,
-                    is_let_or_const: is_let,
-                    static_members: Vec::new(),
-                    end_stmt_span: stmt_span,
-                });
+                current = Some(group);
+                continue;
             }
-            // Check if this is a static member assignment for the current class
-            else if let Some(ref mut group) = current_group {
-                if let Some((static_member, expr_stmt_span)) =
-                    self.get_static_member_assignment(stmt, group.class_name)
-                {
-                    if ANGULAR_STATICS_TO_WRAP.contains(&static_member) {
-                        group.static_members.push(expr_stmt_span);
-                        group.end_stmt_span = expr_stmt_span;
-                    }
-                } else {
-                    // Non-static-member statement breaks the chain
-                    // Finalize current group if it has static members
-                    if !group.static_members.is_empty() {
-                        groups.push(current_group.take().unwrap());
-                    }
-                    current_group = None;
+            let Some(group) = current.as_mut() else { continue };
+            // the CLI's analyzeClassSiblings: Angular statics and pure values join the class; any other value
+            // assigned to it is a possible side effect, and another kind of statement ends the group
+            match self.get_static_member_assignment(stmt, group.class_name) {
+                Some((member, span, _)) if ANGULAR_STATICS_TO_WRAP.contains(&member) => {
+                    group.static_members.push(span);
+                    group.end = span.end;
                 }
+                Some((member, span, value)) if can_wrap_property(member, value, bindings, source) => {
+                    group.end = span.end;
+                }
+                Some(_) => {
+                    group.side_effects = true;
+                    groups.extend(current.take());
+                }
+                None => groups.extend(current.take()),
             }
         }
-
-        // Finalize last group
-        if let Some(group) = current_group {
-            if !group.static_members.is_empty() {
-                groups.push(group);
-            }
-        }
-
+        groups.extend(current);
         groups
     }
 
-    /// Get class declaration info (name, whether it's let/const, and span).
-    fn get_class_declaration_info<'a>(
-        &self,
-        stmt: &'a Statement<'a>,
-    ) -> Option<(&'a str, bool, Span)> {
-        if let Statement::VariableDeclaration(var_decl) = stmt {
-            // Must be let or const (not var)
-            let is_let_or_const = matches!(
-                var_decl.kind,
-                VariableDeclarationKind::Let | VariableDeclarationKind::Const
-            );
-
-            // Check for pattern: let X = class X {}
-            if let Some(decl) = var_decl.declarations.first() {
-                if let Some(init) = &decl.init {
-                    if let Expression::ClassExpression(_class) = init {
-                        // Get the variable name from the binding pattern
-                        if let BindingPattern::BindingIdentifier(ident) = &decl.id {
-                            return Some((ident.name.as_str(), is_let_or_const, var_decl.span));
-                        }
-                    }
-                }
+    /// The class a top-level statement declares, if any
+    fn get_class_declaration_info<'a>(&self, stmt: &'a Statement<'a>) -> Option<ClassGroup<'a>> {
+        let group = |class_name, kind, class, start, end| ClassGroup { class_name, kind, class, start, static_members: Vec::new(), end, side_effects: false };
+        match stmt {
+            Statement::VariableDeclaration(var_decl) if var_decl.declarations.len() == 1 => {
+                let decl = &var_decl.declarations[0];
+                let (BindingPattern::BindingIdentifier(ident), Some(Expression::ClassExpression(class))) = (&decl.id, &decl.init) else {
+                    return None;
+                };
+                let keyword = match var_decl.kind {
+                    VariableDeclarationKind::Let => "let",
+                    VariableDeclarationKind::Const => "const",
+                    VariableDeclarationKind::Var => "var",
+                    _ => return None,
+                };
+                Some(group(ident.name.as_str(), DeclarationKind::Variable(keyword), &**class, var_decl.span.start, var_decl.span.end))
             }
-        }
-
-        // Also handle class declarations: class X {}
-        if let Statement::ClassDeclaration(class) = stmt {
-            if let Some(ident) = &class.id {
-                return Some((ident.name.as_str(), true, class.span));
+            Statement::ClassDeclaration(class) => {
+                let ident = class.id.as_ref()?;
+                Some(group(ident.name.as_str(), DeclarationKind::Declaration, &**class, class.span.start, class.span.end))
             }
+            Statement::ExportDeclaration(export) => {
+                let Declaration::ClassDeclaration(class) = &export.declaration else { return None };
+                let ident = class.id.as_ref()?;
+                Some(group(ident.name.as_str(), DeclarationKind::Declaration, &**class, class.span.start, class.span.end))
+            }
+            _ => None,
         }
-
-        None
     }
 
     /// Get the static member name if this is a static member assignment for the given class.
-    fn get_static_member_assignment<'a>(
-        &self,
-        stmt: &'a Statement<'a>,
-        class_name: &str,
-    ) -> Option<(&'a str, Span)> {
-        if let Statement::ExpressionStatement(expr_stmt) = stmt {
-            if let Expression::AssignmentExpression(assign) = &expr_stmt.expression {
-                // Check for: ClassName.staticMember = ...
-                if let AssignmentTarget::AssignmentTargetIdentifier(_) = &assign.left {
-                    // This is a simple identifier, not a member expression
-                    return None;
-                }
-
-                if let AssignmentTarget::StaticMemberExpression(member) = &assign.left {
-                    // Check if the object is the class name
-                    if let Expression::Identifier(obj_ident) = &member.object {
-                        if obj_ident.name.as_str() == class_name {
-                            return Some((member.property.name.as_str(), expr_stmt.span));
-                        }
-                    }
-                }
-            }
+    fn get_static_member_assignment<'a>(&self, stmt: &'a Statement<'a>, class_name: &str) -> Option<(&'a str, Span, &'a Expression<'a>)> {
+        let Statement::ExpressionStatement(expr_stmt) = stmt else { return None };
+        let Expression::AssignmentExpression(assign) = &expr_stmt.expression else { return None };
+        let AssignmentTarget::StaticMemberExpression(member) = &assign.left else { return None };
+        match &member.object {
+            Expression::Identifier(obj) if obj.name.as_str() == class_name => Some((member.property.name.as_str(), expr_stmt.span, &assign.right)),
+            _ => None,
         }
-
-        None
     }
 
-    /// Wrap a class group in a pure IIFE.
-    fn wrap_class_group(&self, group: &ClassGroup<'_>, source: &str) -> Option<Vec<Edit>> {
-        if group.static_members.is_empty() {
-            return None;
-        }
-
-        let mut edits = Vec::new();
-
-        // Get the range of statements to wrap
-        let start_span = group.class_stmt_span;
-        let end_span = group.end_stmt_span;
-
-        // Determine if we need to extract the variable declaration part
-        // Pattern: let X = class X {} -> we wrap the class expression and assignments
-        let (var_prefix, class_expr_start, class_expr_end) =
-            self.extract_var_declaration_parts(start_span, source, group.class_name)?;
-
-        // Build the wrapped code
-        let mut wrapped = String::new();
-
-        // Start with the variable declaration prefix if present
-        if !var_prefix.is_empty() {
-            wrapped.push_str(&var_prefix);
-        }
-
-        // Add IIFE header
-        wrapped.push_str("/* @__PURE__ */ (() => {\n");
-
-        // Add the inner class declaration (re-declare with let inside IIFE)
-        wrapped.push_str("  let ");
-        wrapped.push_str(group.class_name);
-        wrapped.push_str(" = ");
-        let class_body_start = class_expr_start as usize;
-        let class_body_end = class_expr_end as usize;
-        wrapped.push_str(&source[class_body_start..class_body_end]);
-        wrapped.push_str(";\n");
-
-        // Add the static member assignments
-        for static_span in &group.static_members {
-            let stmt_start = static_span.start as usize;
-            let stmt_end = static_span.end as usize;
-            wrapped.push_str("  ");
-            wrapped.push_str(&source[stmt_start..stmt_end]);
-            wrapped.push('\n');
-        }
-
-        // Add return statement and close IIFE
-        wrapped.push_str("  return ");
-        wrapped.push_str(group.class_name);
-        wrapped.push_str(";\n})()");
-
-        // Check if original ended with semicolon
-        let original_end = end_span.end as usize;
-        if original_end < source.len() && source.as_bytes().get(original_end - 1) == Some(&b';') {
-            wrapped.push(';');
+    /// Wrap a class group in a pure IIFE, by inserting around it: other passes' edits inside it stay valid
+    fn wrap_class_group(&self, group: &ClassGroup<'_>, source: &str) -> Vec<Edit> {
+        let name = group.class_name;
+        let keyword = match group.kind {
+            DeclarationKind::Variable(keyword) => keyword,
+            DeclarationKind::Declaration => "let",
+        };
+        let mut end = group.end;
+        // a variable statement keeps its own `;` inside the arrow function
+        let tail = if source.as_bytes().get(end as usize - 1) == Some(&b';') || group.kind == DeclarationKind::Declaration {
+            format!("\n  return {name};\n}})();")
         } else {
-            wrapped.push(';');
+            format!(";\n  return {name};\n}})();")
+        };
+        // nothing after the group on its last line belongs inside
+        if end as usize > source.len() {
+            end = source.len() as u32;
         }
-
-        // Create edit to replace the entire group
-        edits.push(Edit::replace(start_span.start, end_span.end, wrapped));
-
-        Some(edits)
+        vec![
+            Edit::insert(group.start, format!("{keyword} {name} = /* @__PURE__ */ (() => {{\n")),
+            Edit { start: end, end, replacement: tail, priority: 1 },
+        ]
     }
+}
 
-    /// Extract variable declaration parts from a class statement span.
-    /// Returns (var_prefix like "let X = ", class_expr_start, class_expr_end)
-    fn extract_var_declaration_parts(
-        &self,
-        stmt_span: Span,
-        source: &str,
-        class_name: &str,
-    ) -> Option<(String, u32, u32)> {
-        let stmt_text = &source[stmt_span.start as usize..stmt_span.end as usize];
-
-        // Check if it starts with let/const/var
-        if let Some(eq_pos) = stmt_text.find('=') {
-            // Find the variable declaration keyword
-            let prefix = stmt_text[..eq_pos].trim();
-
-            // Split prefix into keyword and name
-            if let Some(first_space) = prefix.find(|c: char| c.is_whitespace()) {
-                let keyword = prefix[..first_space].trim();
-                let var_name = prefix[first_space..].trim();
-
-                // Validate it's a variable declaration
-                if matches!(keyword, "let" | "const" | "var") {
-                    // Find where the class expression starts (after "= ")
-                    let class_start = stmt_span.start + eq_pos as u32 + 1;
-                    // Skip whitespace after =
-                    let mut actual_start = class_start;
-                    while (actual_start as usize) < source.len()
-                        && source.as_bytes()[actual_start as usize].is_ascii_whitespace()
-                    {
-                        actual_start += 1;
-                    }
-
-                    // Find where it ends (before semicolon if present)
-                    let mut class_end = stmt_span.end;
-                    if source.as_bytes().get((class_end - 1) as usize) == Some(&b';') {
-                        class_end -= 1;
-                    }
-
-                    let var_prefix = format!("{} {} = ", keyword, var_name);
-                    return Some((var_prefix, actual_start, class_end));
+/// Names declared at the top level (imports, functions, classes, variables): an identifier bound there is pure to
+/// read, as Babel's `scope.isPure` sees one with a binding
+fn top_level_bindings<'a>(program: &'a Program<'a>) -> FxHashSet<&'a str> {
+    let mut names = FxHashSet::default();
+    let mut add_pattern = |p: &'a BindingPattern<'a>, names: &mut FxHashSet<&'a str>| {
+        if let BindingPattern::BindingIdentifier(id) = p {
+            names.insert(id.name.as_str());
+        }
+    };
+    for stmt in &program.body {
+        let decl: Option<&Declaration> = match stmt {
+            Statement::ImportDeclaration(import) => {
+                for spec in import.specifiers.iter().flatten() {
+                    names.insert(spec.local().name.as_str());
+                }
+                None
+            }
+            Statement::ExportDeclaration(export) => Some(&export.declaration),
+            other => other.as_declaration(),
+        };
+        match decl {
+            Some(Declaration::VariableDeclaration(v)) => {
+                for d in &v.declarations {
+                    add_pattern(&d.id, &mut names);
                 }
             }
-        } else {
-            // It's a class declaration: class X {}
-            // We must assign the IIFE result to a variable so the class name
-            // remains in scope for subsequent export statements.
-            let var_prefix = format!("let {} = ", class_name);
-            return Some((var_prefix, stmt_span.start, stmt_span.end));
+            Some(Declaration::FunctionDeclaration(f)) => {
+                if let Some(id) = &f.id {
+                    names.insert(id.name.as_str());
+                }
+            }
+            Some(Declaration::ClassDeclaration(c)) => {
+                if let Some(id) = &c.id {
+                    names.insert(id.name.as_str());
+                }
+            }
+            _ => {}
         }
+    }
+    names
+}
 
-        None
+/// The Angular CLI's `analyzeClassStaticProperties`: every static property, and every static block assigning
+/// `this.<name> = …`, holds an Angular definition or a value without side effects. Static blocks of more than one
+/// statement, computed keys, and assignments to anything but `this` are not wrapped.
+fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>, source: &str) -> bool {
+    let mut should_wrap = false;
+    for element in &class.body.body {
+        match element {
+            ClassElement::PropertyDefinition(prop) if prop.r#static => {
+                let PropertyKey::StaticIdentifier(key) = &prop.key else {
+                    if matches!(prop.key, PropertyKey::PrivateIdentifier(_)) {
+                        continue;
+                    }
+                    return false;
+                };
+                match &prop.value {
+                    None => should_wrap = true,
+                    Some(value) if can_wrap_property(key.name.as_str(), value, bindings, source) => should_wrap = true,
+                    Some(_) => return false,
+                }
+            }
+            ClassElement::StaticBlock(block) => {
+                if block.body.len() > 1 {
+                    return false;
+                }
+                let Some(Statement::ExpressionStatement(stmt)) = block.body.first() else { continue };
+                let Expression::AssignmentExpression(assign) = &stmt.expression else { continue };
+                let AssignmentTarget::StaticMemberExpression(member) = &assign.left else {
+                    if matches!(assign.left, AssignmentTarget::ComputedMemberExpression(_) | AssignmentTarget::PrivateFieldExpression(_)) {
+                        return false;
+                    }
+                    continue;
+                };
+                if !matches!(member.object, Expression::ThisExpression(_)) {
+                    return false;
+                }
+                if can_wrap_property(member.property.name.as_str(), &assign.right, bindings, source) {
+                    should_wrap = true;
+                } else {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    should_wrap
+}
+
+/// The Angular CLI's `canWrapProperty`: an Angular definition, a value marked pure, or a pure expression
+fn can_wrap_property(name: &str, value: &Expression<'_>, bindings: &FxHashSet<&str>, source: &str) -> bool {
+    ANGULAR_STATICS_TO_WRAP.contains(&name) || has_pure_annotation(value.span(), source) || is_pure(value, bindings)
+}
+
+/// A `/* @__PURE__ */`, `/* #__PURE__ */` or `@pureOrBreakMyCode` comment right before the expression
+fn has_pure_annotation(span: Span, source: &str) -> bool {
+    let before = source[..span.start as usize].trim_end();
+    let Some(body) = before.strip_suffix("*/") else { return false };
+    let Some(open) = body.rfind("/*") else { return false };
+    let comment = &body[open..];
+    comment.contains("@__PURE__") || comment.contains("#__PURE__") || comment.contains("@pureOrBreakMyCode")
+}
+
+/// Babel's `scope.isPure`, for what static members hold: literals, functions, classes, bound identifiers, and
+/// arrays, objects, templates and operators made of those
+fn is_pure(expr: &Expression<'_>, bindings: &FxHashSet<&str>) -> bool {
+    match expr {
+        Expression::BooleanLiteral(_)
+        | Expression::NullLiteral(_)
+        | Expression::NumericLiteral(_)
+        | Expression::BigIntLiteral(_)
+        | Expression::RegExpLiteral(_)
+        | Expression::StringLiteral(_)
+        | Expression::FunctionExpression(_)
+        | Expression::ArrowFunctionExpression(_) => true,
+        Expression::Identifier(id) => bindings.contains(id.name.as_str()),
+        Expression::TemplateLiteral(t) => t.expressions.iter().all(|e| is_pure(e, bindings)),
+        Expression::ArrayExpression(a) => a.elements.iter().all(|el| match el {
+            oxc_ast::ast::ArrayExpressionElement::SpreadElement(_) => false,
+            oxc_ast::ast::ArrayExpressionElement::Elision(_) => true,
+            other => other.as_expression().is_some_and(|e| is_pure(e, bindings)),
+        }),
+        Expression::ObjectExpression(o) => o.properties.iter().all(|p| match p {
+            ObjectPropertyKind::SpreadProperty(_) => false,
+            ObjectPropertyKind::ObjectProperty(prop) => {
+                let key_pure = !prop.computed || prop.key.as_expression().is_some_and(|k| is_pure(k, bindings));
+                key_pure && (prop.method || matches!(prop.kind, PropertyKind::Init)) && (prop.method || is_pure(&prop.value, bindings))
+            }
+        }),
+        Expression::UnaryExpression(u) => is_pure(&u.argument, bindings),
+        Expression::BinaryExpression(b) => is_pure(&b.left, bindings) && is_pure(&b.right, bindings),
+        Expression::ParenthesizedExpression(p) => is_pure(&p.expression, bindings),
+        Expression::ClassExpression(c) => {
+            c.heritage.as_ref().is_none_or(|h| is_pure(&h.expression, bindings))
+                && c.body.body.iter().all(|el| match el {
+                    ClassElement::MethodDefinition(m) => !m.computed,
+                    ClassElement::PropertyDefinition(p) => !p.computed && p.value.as_ref().is_none_or(|v| is_pure(v, bindings)),
+                    _ => false,
+                })
+        }
+        _ => false,
     }
 }
 
@@ -339,24 +370,6 @@ impl Default for AdjustStaticMembersTransformer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// A group of a class declaration and its associated static member assignments.
-struct ClassGroup<'a> {
-    /// The name of the class.
-    class_name: &'a str,
-    /// Index of the class statement in the program body.
-    #[allow(dead_code)]
-    class_stmt_index: usize,
-    /// Span of the class declaration statement.
-    class_stmt_span: Span,
-    /// Whether the class is declared with let or const (vs var or class declaration).
-    #[allow(dead_code)]
-    is_let_or_const: bool,
-    /// Spans of static member assignment statements that follow the class.
-    static_members: Vec<Span>,
-    /// Span of the last statement in this group.
-    end_stmt_span: Span,
 }
 
 #[cfg(test)]
@@ -427,5 +440,71 @@ MyService.ɵfac = (t) => new (t || MyService)();"#;
 
         let result = transform(code);
         assert!(result.contains("/* @__PURE__ */ (() => {"));
+    }
+
+    /// The linker's output form: Angular definitions in static blocks inside the class
+    #[test]
+    fn wraps_class_with_angular_definitions_in_static_blocks() {
+        let code = r#"class ButtonComponent {
+    constructor() { this.size = 1; }
+    static { this.ɵfac = function ButtonComponent_Factory(t) { return new (t || ButtonComponent)(); }; }
+    static { this.ɵcmp = (() => { return i0.ɵɵdefineComponent({ type: ButtonComponent }); })(); }
+}
+export { ButtonComponent };"#;
+        let result = transform(code);
+        assert!(result.starts_with("let ButtonComponent = /* @__PURE__ */ (() => {\nclass ButtonComponent {"), "{result}");
+        assert!(result.contains("return ButtonComponent;\n})();\nexport { ButtonComponent };"), "{result}");
+    }
+
+    #[test]
+    fn wraps_exported_class_declarations() {
+        let code = "export class A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}";
+        let result = transform(code);
+        assert_eq!(result, "export let A = /* @__PURE__ */ (() => {\nclass A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}\n  return A;\n})();");
+    }
+
+    /// Deepkit's runtime type: an array of strings and functions
+    #[test]
+    fn wraps_pure_static_values() {
+        let code = r#"class T {
+    static { this.__type = ['x', function () { return 1; }, () => T, 'P"0!']; }
+    static count = 0;
+}"#;
+        assert!(transform(code).contains("/* @__PURE__ */ (() => {"));
+    }
+
+    #[test]
+    fn keeps_static_members_with_side_effects() {
+        for code in [
+            "class A {\n    static { this.x = register(A); }\n}",
+            "class A {\n    static { register(A); this.ɵfac = f; }\n}",
+            "class A {\n    static { window.a = 1; }\n}",
+            "class A {\n    static x = sideEffect();\n}",
+            "class A {\n    static [key] = 1;\n}",
+            "class A {\n    static x = undeclaredGlobal;\n}",
+        ] {
+            assert_eq!(transform(code), code, "must not wrap: {code}");
+        }
+    }
+
+    #[test]
+    fn marked_pure_static_values_wrap() {
+        let code = "class A {\n    static x = /* @__PURE__ */ make();\n}";
+        assert!(transform(code).contains("/* @__PURE__ */ (() => {"));
+    }
+
+    /// A class whose body has an `=` (a constructor assignment) with downleveled statics after it
+    #[test]
+    fn wraps_class_declaration_with_assignments_inside() {
+        let code = "class A {\n    constructor() { this.a = 1; }\n}\nA.ɵfac = function (t) { return new (t || A)(); };\nA.ɵcmp = defineComponent({});";
+        let result = transform(code);
+        assert!(result.starts_with("let A = /* @__PURE__ */ (() => {\nclass A {"), "{result}");
+        assert!(result.ends_with("A.ɵcmp = defineComponent({});\n  return A;\n})();"), "{result}");
+    }
+
+    #[test]
+    fn plain_classes_stay() {
+        let code = "class A {\n    method() { return 1; }\n}";
+        assert_eq!(transform(code), code);
     }
 }
