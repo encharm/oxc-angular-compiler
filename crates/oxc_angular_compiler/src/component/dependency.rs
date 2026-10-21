@@ -75,6 +75,9 @@ pub struct R3DependencyMetadata<'a> {
     /// as a whole becomes `ɵɵinvalidFactory()` — matching Angular's
     /// `ValueUnavailableKind.TYPE_ONLY_IMPORT` behaviour. See issue #288.
     pub type_only_invalid: bool,
+
+    /// The token is a string literal (`@Inject('TOKEN')`), not a reference.
+    pub token_is_string: bool,
 }
 
 impl<'a> R3DependencyMetadata<'a> {
@@ -91,6 +94,7 @@ impl<'a> R3DependencyMetadata<'a> {
             self_: false,
             skip_self: false,
             type_only_invalid: false,
+            token_is_string: false,
         }
     }
 
@@ -107,6 +111,7 @@ impl<'a> R3DependencyMetadata<'a> {
             self_: false,
             skip_self: false,
             type_only_invalid: false,
+            token_is_string: false,
         }
     }
 
@@ -126,6 +131,7 @@ impl<'a> R3DependencyMetadata<'a> {
             self_: false,
             skip_self: false,
             type_only_invalid: true,
+            token_is_string: false,
         }
     }
 
@@ -166,6 +172,7 @@ impl<'a> R3DependencyMetadata<'a> {
             self_: false,
             skip_self: false,
             type_only_invalid: false,
+            token_is_string: false,
         }
     }
 
@@ -373,6 +380,13 @@ fn create_token_expression<'a>(
     token_name: &Ident<'a>,
     namespace_registry: &mut NamespaceRegistry<'a>,
 ) -> OutputExpression<'a> {
+    if dep.token_is_string {
+        // `@Inject('TOKEN')` injects the string itself
+        return OutputExpression::Literal(Box::new_in(
+            LiteralExpr { value: LiteralValue::String(token_name.clone()), source_span: None },
+            &allocator,
+        ));
+    }
     if let Some(ref source_module) = dep.token_source_module {
         // Check if this token has an existing named import that can be reused
         if dep.has_named_import {
