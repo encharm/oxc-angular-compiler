@@ -954,6 +954,7 @@ fn extract_param_dependency<'a>(
     let mut self_ = false;
     let mut host = false;
     let mut inject_token: Option<Ident<'a>> = None;
+    let mut inject_token_is_string = false;
     let mut attribute_name: Option<Ident<'a>> = None;
 
     for decorator in &param.decorators {
@@ -963,7 +964,15 @@ fn extract_param_dependency<'a>(
                     // @Inject(TOKEN) - extract the token
                     if let Expression::CallExpression(call) = &decorator.expression {
                         if let Some(arg) = call.arguments.first() {
-                            inject_token = extract_inject_token(arg);
+                            // `@Inject('TOKEN')`: a string token, as ngtsc compiles it
+                            if let Argument::StringLiteral(lit) = arg
+                                && let Some(value) = lit.value.as_str()
+                            {
+                                inject_token = Some(value.into());
+                                inject_token_is_string = true;
+                            } else {
+                                inject_token = extract_inject_token(arg);
+                            }
                         }
                     }
                 }
@@ -994,6 +1003,16 @@ fn extract_param_dependency<'a>(
     // Handle @Attribute decorator
     if let Some(attr_name) = attribute_name {
         return R3DependencyMetadata::attribute(attr_name);
+    }
+
+    if inject_token_is_string && let Some(value) = token {
+        let mut dep = R3DependencyMetadata::new(value);
+        dep.token_is_string = true;
+        dep.optional = optional;
+        dep.skip_self = skip_self;
+        dep.self_ = self_;
+        dep.host = host;
+        return dep;
     }
 
     // Build the dependency metadata
