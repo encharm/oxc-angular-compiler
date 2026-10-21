@@ -19,8 +19,8 @@ use crate::directive::{
     try_parse_signal_input, try_parse_signal_model, try_parse_signal_output,
 };
 use crate::output::ast::{
-    ArrowFunctionBody, ArrowFunctionExpr, LiteralArrayExpr, LiteralExpr, LiteralMapEntry,
-    LiteralMapExpr, LiteralValue, OutputExpression, ReadPropExpr, ReadVarExpr,
+    ArrowFunctionBody, ArrowFunctionExpr, InvokeFunctionExpr, LiteralArrayExpr, LiteralExpr,
+    LiteralMapEntry, LiteralMapExpr, LiteralValue, OutputExpression, ReadPropExpr, ReadVarExpr,
 };
 use crate::output::oxc_converter::{
     convert_oxc_expression, convert_plain_properties, is_plain_property, make_raw_source,
@@ -781,7 +781,23 @@ fn build_signal_query_decorator<'a>(
     // query's `WrappedNodeExpr` fallback, only the raw source can stand in.
     let first = call.arguments.first()?;
     let predicate = match first.as_expression() {
-        Some(expr) => convert_oxc_expression(allocator, expr, source_text)?,
+        // Like ngtsc's `memberMetadataFromSignalQuery`, a predicate other than a string or a
+        // call (a class) is wrapped in `forwardRef(() => <predicate>)`: `setClassMetadata` runs
+        // as soon as the class is defined, unlike the query initializer, so a class declared
+        // later in the file would be read before it is initialized.
+        Some(expr) => {
+            let predicate = convert_oxc_expression(allocator, expr, source_text)?;
+            let string_or_call = match expr {
+                Expression::StringLiteral(_) | Expression::CallExpression(_) => true,
+                Expression::TemplateLiteral(template) => template.expressions.is_empty(),
+                _ => false,
+            };
+            if string_or_call {
+                predicate
+            } else {
+                forward_ref(allocator, namespace_registry, predicate)
+            }
+        }
         None => make_raw_source(allocator, source_text, first.span())?,
     };
     let mut args = AllocVec::new_in(&allocator);
@@ -810,6 +826,61 @@ fn build_signal_query_decorator<'a>(
     Some(build_core_decorator(allocator, namespace_registry, decorator_name, args))
 }
 
+/// `i0.forwardRef(() => <expression>)`.
+fn forward_ref<'a>(
+    allocator: &'a Allocator,
+    namespace_registry: &mut NamespaceRegistry<'a>,
+    expression: OutputExpression<'a>,
+) -> OutputExpression<'a> {
+    let arrow = OutputExpression::ArrowFunction(Box::new_in(
+        ArrowFunctionExpr {
+            params: AllocVec::new_in(&allocator),
+            body: ArrowFunctionBody::Expression(Box::new_in(expression, &allocator)),
+            source_span: None,
+        },
+        &allocator,
+    ));
+    let mut args = AllocVec::new_in(&allocator);
+    args.push(arrow);
+    OutputExpression::InvokeFunction(Box::new_in(
+        InvokeFunctionExpr {
+            fn_expr: Box::new_in(
+                core_member(allocator, namespace_registry, "forwardRef"),
+                &allocator,
+            ),
+            args,
+            pure: false,
+            optional: false,
+            source_span: None,
+        },
+        &allocator,
+    ))
+}
+
+/// `i0.<name>`: a member of the `@angular/core` namespace import.
+fn core_member<'a>(
+    allocator: &'a Allocator,
+    namespace_registry: &mut NamespaceRegistry<'a>,
+    name: &'static str,
+) -> OutputExpression<'a> {
+    let core_namespace = namespace_registry.get_or_assign(&Ident::from(crate::r3::CORE));
+    OutputExpression::ReadProp(Box::new_in(
+        ReadPropExpr {
+            receiver: Box::new_in(
+                OutputExpression::ReadVar(Box::new_in(
+                    ReadVarExpr { name: core_namespace, source_span: None },
+                    &allocator,
+                )),
+                &allocator,
+            ),
+            name: Ident::from(name),
+            optional: false,
+            source_span: None,
+        },
+        &allocator,
+    ))
+}
+
 /// Build `{ type: i0.<name>, args: ["<arg>"] }` for a decorator taking a single string.
 fn build_core_decorator_with_string_arg<'a>(
     allocator: &'a Allocator,
@@ -832,22 +903,7 @@ fn build_core_decorator<'a>(
     decorator_name: &'static str,
     args: AllocVec<'a, OutputExpression<'a>>,
 ) -> OutputExpression<'a> {
-    let core_namespace = namespace_registry.get_or_assign(&Ident::from(crate::r3::CORE));
-    let type_expr = OutputExpression::ReadProp(Box::new_in(
-        ReadPropExpr {
-            receiver: Box::new_in(
-                OutputExpression::ReadVar(Box::new_in(
-                    ReadVarExpr { name: core_namespace, source_span: None },
-                    &allocator,
-                )),
-                &allocator,
-            ),
-            name: Ident::from(decorator_name),
-            optional: false,
-            source_span: None,
-        },
-        &allocator,
-    ));
+    let type_expr = core_member(allocator, namespace_registry, decorator_name);
 
     let mut entries = AllocVec::new_in(&allocator);
     entries.push(LiteralMapEntry::new(Ident::from("type"), type_expr, false));
