@@ -120,10 +120,14 @@ fn run(args: &Args) -> Result<usize, String> {
     let root = common_root(generated.iter().map(|(path, _)| path.as_path()))
         .unwrap_or_else(|| tsconfig.parent().unwrap().to_path_buf());
     let out = match &args.out {
-        Some(out) => std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?,
+        // canonical, as the sources' paths are (the tsconfig it writes names them relative to it)
+        Some(out) => {
+            std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+            std::fs::canonicalize(out).map_err(|e| format!("{}: {e}", out.display()))?
+        }
         None => sibling_out_dir(&root),
     };
-    let _ = std::fs::remove_dir_all(&out);
+    clear_out_dir(&out)?;
     let mut sources_by_tcb: Vec<(PathBuf, PathBuf, GeneratedFile)> = vec![];
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for (path, mut file) in generated {
@@ -178,7 +182,7 @@ fn run(args: &Args) -> Result<usize, String> {
         });
     }
     if !args.keep {
-        let _ = std::fs::remove_dir_all(&out);
+        remove_out_dir(&out)?;
     }
 
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -361,6 +365,28 @@ fn template_parse_options(options: &NgpCompilerOptions) -> TemplateParseOptions 
         i18n_normalize_line_endings_in_icus: Some(options.i18n_normalize_line_endings_in_icus == Some(true)),
         ..TemplateParseOptions::default()
     }
+}
+
+/// The file that marks a directory as ngcheck's: only such a directory (or an empty one) is ever deleted
+const OUT_MARKER: &str = ".ngcheck";
+
+/// Empties `out` for this run's files and marks it as ngcheck's
+fn clear_out_dir(out: &Path) -> Result<(), String> {
+    remove_out_dir(out)?;
+    std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    std::fs::write(out.join(OUT_MARKER), "").map_err(|e| format!("{}: {e}", out.display()))
+}
+
+/// Deletes `out` when it is ngcheck's, or empty; refuses a directory holding anything else
+fn remove_out_dir(out: &Path) -> Result<(), String> {
+    let Ok(mut entries) = std::fs::read_dir(out) else { return Ok(()) };
+    if entries.next().is_some() && !out.join(OUT_MARKER).is_file() {
+        return Err(format!(
+            "{} holds files ngcheck did not write, so it is not deleted; give --out a new or empty directory",
+            out.display()
+        ));
+    }
+    std::fs::remove_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))
 }
 
 /// tsrs from `@codecharm/tsrs` (its install links it to `bin/tsrs`) in the nearest `node_modules`, else `tsrs` on the
