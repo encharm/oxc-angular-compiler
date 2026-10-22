@@ -3,7 +3,7 @@
     "repository": "https://github.com/angular/angular",
     "commit": "3cc1edf3210a9debb0be57a4e99e53a54505db32"
   },
-  "note": "processor.ts, compiler-utils.ts and diagnostic.ts are ported in part: what generates type-check blocks (see the comments in the Rust files). t2_binder.rs also holds what the binder uses of render3/view/util.ts (createCssSelectorFromNode), combined_visitor.ts, ml_parser/tags.ts (splitNsName, isNgTemplate), and the Visitor interface of render3/r3_ast.ts and RecursiveAstVisitor of expression_parser/ast.ts.",
+  "note": "processor.ts, compiler-utils.ts and diagnostic.ts are ported in part: what generates type-check blocks (see the comments in the Rust files). t2_binder.rs also holds what the binder uses of render3/view/util.ts (createCssSelectorFromNode), combined_visitor.ts, ml_parser/tags.ts (splitNsName, isNgTemplate), and the Visitor interface of render3/r3_ast.ts and RecursiveAstVisitor of expression_parser/ast.ts. error_details.rs holds only the guide links of the diagnostics module (error_code.ts: the codes with guides; util.ts: addDiagnosticDetails, appendMessageText).",
   "files": [
     {
       "upstream": "packages/compiler/src/core.ts",
@@ -244,6 +244,18 @@
     {
       "upstream": "packages/compiler-cli/src/ngtsc/typecheck/src/comments.ts",
       "rust": "crates/ng_check/src/ngtsc/comments.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/diagnostics/src/error_details_base_url.ts",
+      "rust": "crates/ng_check/src/ngtsc/error_details.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/diagnostics/src/error_code.ts",
+      "rust": "crates/ng_check/src/ngtsc/error_details.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/diagnostics/src/util.ts",
+      "rust": "crates/ng_check/src/ngtsc/error_details.rs"
     }
   ],
   "vendored": [
@@ -252,6 +264,12 @@
       "path": "vendor/ng-analyze",
       "omit": [
         "BUILD.bazel"
+      ],
+      "patches": [
+        {
+          "file": "crates/ng_check/patches/ng-analyze-inheritance-order.patch",
+          "why": "flatten inherited metadata base class first, as ngtsc's flattenInheritedDirectiveMetadata: the type-check blocks list inputs in that order"
+        }
       ]
     }
   ]

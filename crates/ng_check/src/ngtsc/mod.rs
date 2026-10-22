@@ -3,4 +3,5 @@
 
 pub mod comments;
 pub mod diagnostics;
+pub mod error_details;
 pub mod tcb_util;

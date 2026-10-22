@@ -21,6 +21,7 @@ use ng_analyze::NgDiagnostic;
 use oxc_allocator::Allocator;
 
 use crate::ngtsc::diagnostics::{should_report_diagnostic, translate_diagnostic};
+use crate::ngtsc::error_details::{add_message_text_details, doc_page_base_url};
 use crate::ngp::compiler_options::NgpCompilerOptions;
 use crate::ngp::compiler_utils::TemplateParseOptions;
 use crate::ngp::file_analysis::FileCache;
@@ -186,7 +187,14 @@ fn run(args: &Args) -> Result<usize, String> {
     }
 
     let cwd = std::env::current_dir().unwrap_or_default();
+    // ngtsc's error guide links, for the project's Angular version
+    let doc_page_base_url = doc_page_base_url(&angular_version(&tsconfig));
     let mut errors = 0;
+    for d in &mut diagnostics {
+        if let Some(code) = d.code.strip_prefix("NG").and_then(|code| code.parse().ok()) {
+            d.message = add_message_text_details(code, &d.message, &doc_page_base_url);
+        }
+    }
     for d in &diagnostics {
         let category = match d.category {
             Category::Error => {
@@ -238,6 +246,20 @@ fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, St
     }
     Ok(generated)
 }
+
+/// The version of the project's `@angular/compiler` (`VERSION.full`), from the nearest `node_modules`; else the version
+/// the port follows
+fn angular_version(tsconfig: &Path) -> String {
+    tsconfig
+        .ancestors()
+        .find_map(|dir| std::fs::read_to_string(dir.join("node_modules/@angular/compiler/package.json")).ok())
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|json| json.get("version")?.as_str().map(String::from))
+        .unwrap_or_else(|| PORTED_ANGULAR_VERSION.to_string())
+}
+
+/// The Angular version of the commit `UPSTREAM.json` pins
+const PORTED_ANGULAR_VERSION: &str = "22.3.0-next.2+sha-3cc1edf";
 
 /// An ng-analyze diagnostic, located in `default_file` when it names no file
 fn diagnostic_of(d: &NgDiagnostic, default_file: &Path) -> Diagnostic {

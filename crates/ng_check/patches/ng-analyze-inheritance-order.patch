@@ -1,0 +1,89 @@
+diff --git a/vendor/ng-analyze/src/analyzer/resolver.rs b/vendor/ng-analyze/src/analyzer/resolver.rs
+index 6e41a82..0db77f1 100644
+--- a/vendor/ng-analyze/src/analyzer/resolver.rs
++++ b/vendor/ng-analyze/src/analyzer/resolver.rs
+@@ -69,32 +69,32 @@ fn field_matches(a: &crate::AngularFieldMetadata, b: &crate::AngularFieldMetadat
+     }
+ }
+ 
+-fn merge_class_info(info: &mut ClassInfo, super_info: &ClassInfo) {
+-    if let Some(super_fields) = &super_info.fields {
+-        let local_fields = info.fields.get_or_insert_with(Vec::new);
+-        for sf in super_fields {
+-            let exists = local_fields.iter().any(|f| field_matches(sf, f));
+-            if !exists {
+-                local_fields.push(sf.clone());
++// ngcheck: merges as ngtsc's `flattenInheritedDirectiveMetadata` does, the base class first: `addMetadata` recurses
++// into the base before merging the class's own metadata, and `ClassPropertyMapping.merge` keeps an inherited field's
++// position while the derived class's definition replaces it. The type-check blocks list inputs in that order.
++fn merge_derived_class_info(merged: &mut ClassInfo, derived: &ClassInfo) {
++    if let Some(derived_fields) = &derived.fields {
++        let fields = merged.fields.get_or_insert_with(Vec::new);
++        for df in derived_fields {
++            match fields.iter_mut().find(|f| field_matches(df, f)) {
++                Some(field) => *field = df.clone(),
++                None => fields.push(df.clone()),
+             }
+         }
+     }
+-    info.is_structural = info.is_structural || super_info.is_structural;
++    merged.is_structural = merged.is_structural || derived.is_structural;
+ 
+-    for name in &super_info.public_methods {
+-        if !info.public_methods.contains(name) {
+-            info.public_methods.push(name.clone());
++    for name in &derived.public_methods {
++        if !merged.public_methods.contains(name) {
++            merged.public_methods.push(name.clone());
+         }
+     }
+ 
+-    if let Some(super_host_dirs) = &super_info.host_directives {
+-        let local_host_dirs = info.host_directives.get_or_insert_with(Vec::new);
+-        for shd in super_host_dirs {
+-            if !local_host_dirs
+-                .iter()
+-                .any(|hd| hd.directive == shd.directive)
+-            {
+-                local_host_dirs.push(shd.clone());
++    if let Some(derived_host_dirs) = &derived.host_directives {
++        let host_dirs = merged.host_directives.get_or_insert_with(Vec::new);
++        for dhd in derived_host_dirs {
++            if !host_dirs.iter().any(|hd| hd.directive == dhd.directive) {
++                host_dirs.push(dhd.clone());
+             }
+         }
+     }
+@@ -110,6 +110,8 @@ pub fn flatten_class_info<'a, Fs: ResourceResolverFs + Clone + 'static>(
+         let mut visited = HashSet::new();
+         visited.insert(info.reference_id);
+ 
++        // the base classes, nearest first
++        let mut bases = vec![];
+         while let Some(super_decl) = current_super {
+             let resolved = resolve_declaration_async(&super_decl, &current_file, ctx).await;
+             let Some(super_info) = resolved else {
+@@ -120,11 +122,21 @@ pub fn flatten_class_info<'a, Fs: ResourceResolverFs + Clone + 'static>(
+                 break;
+             }
+ 
+-            merge_class_info(&mut info, &super_info);
+-
+             current_super = super_info.super_class.clone();
+             current_file = super_info.file_path.clone();
++            bases.push(super_info);
++        }
++
++        // ngcheck: fold from the base-most class down, as ngtsc does (`merge_derived_class_info`)
++        let Some(mut merged) = bases.pop() else { return info };
++        for base in bases.iter().rev() {
++            merge_derived_class_info(&mut merged, base);
+         }
++        merge_derived_class_info(&mut merged, &info);
++        info.fields = merged.fields;
++        info.is_structural = merged.is_structural;
++        info.public_methods = merged.public_methods;
++        info.host_directives = merged.host_directives;
+         info
+     }
+     .boxed()
