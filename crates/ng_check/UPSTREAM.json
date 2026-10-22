@@ -34,6 +34,10 @@
       "rust": "crates/ng_check/src/angular/schema/dom_element_schema_registry.rs"
     },
     {
+      "upstream": "packages/compiler/src/schema/dom_security_schema.ts",
+      "rust": "crates/ng_check/src/angular/schema/dom_security_schema.rs"
+    },
+    {
       "upstream": "packages/compiler/src/typecheck/api.ts",
       "rust": "crates/ng_check/src/typecheck/api.rs"
     },
