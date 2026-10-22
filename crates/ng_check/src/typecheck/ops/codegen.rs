@@ -1,5 +1,8 @@
 //! `packages/compiler/src/typecheck/ops/codegen.ts`
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use oxc_angular_compiler::ast::expression::AbsoluteSourceSpan;
 use oxc_span::Span;
 
@@ -25,8 +28,15 @@ impl From<Span> for SpanInfo {
 }
 
 // codegen.ts:14 TcbExpr: an expression generated within a type check block
+///
+/// A shared handle, as a TypeScript object is: a clone is the same expression, and the methods change it for every
+/// holder. TypeScript relies on that: `Scope.resolve` hands out an op's cached result, which `addParseSpanInfo` and
+/// `wrapForTypeChecker` then change, so a later use of the same variable prints what earlier ones did to it.
 #[derive(Debug, Clone)]
-pub struct TcbExpr {
+pub struct TcbExpr(Rc<RefCell<TcbExprState>>);
+
+#[derive(Debug)]
+struct TcbExprState {
     source: String,
     span_comment: Option<String>,
     identifier_comment: Option<String>,
@@ -36,7 +46,12 @@ pub struct TcbExpr {
 impl TcbExpr {
     // codegen.ts:27 constructor
     pub fn new(source: impl Into<String>) -> Self {
-        Self { source: source.into(), span_comment: None, identifier_comment: None, ignore_comment: None }
+        Self(Rc::new(RefCell::new(TcbExprState {
+            source: source.into(),
+            span_comment: None,
+            identifier_comment: None,
+            ignore_comment: None,
+        })))
     }
 
     // codegen.ts:30 quoteAndEscape: `JSON.stringify(value)`
@@ -46,13 +61,14 @@ impl TcbExpr {
 
     // codegen.ts:40 print
     pub fn print(&self, ignore_comments: bool) -> String {
+        let state = self.0.borrow();
         if ignore_comments {
-            return self.source.clone();
+            return state.source.clone();
         }
-        let mut out = self.source.clone();
-        out.push_str(&format_comment(self.identifier_comment.as_deref()));
-        out.push_str(&format_comment(self.ignore_comment.as_deref()));
-        out.push_str(&format_comment(self.span_comment.as_deref()));
+        let mut out = state.source.clone();
+        out.push_str(&format_comment(state.identifier_comment.as_deref()));
+        out.push_str(&format_comment(state.ignore_comment.as_deref()));
+        out.push_str(&format_comment(state.span_comment.as_deref()));
         out
     }
 
@@ -62,32 +78,35 @@ impl TcbExpr {
     }
 
     // codegen.ts:57 addParseSpanInfo; offsets as JavaScript string indices (`crate::span`)
-    pub fn add_parse_span_info(mut self, span: impl Into<SpanInfo>) -> Self {
+    pub fn add_parse_span_info(self, span: impl Into<SpanInfo>) -> Self {
         let span = span.into();
-        self.span_comment =
+        self.0.borrow_mut().span_comment =
             Some(format!("{},{}", crate::span::utf16(span.start), crate::span::utf16(span.end)));
         self
     }
 
     // codegen.ts:74 markIgnoreDiagnostics
-    pub fn mark_ignore_diagnostics(mut self) -> Self {
-        self.ignore_comment = Some(format!("{}:ignore", CommentTriviaType::Diagnostic.as_str()));
+    pub fn mark_ignore_diagnostics(self) -> Self {
+        self.0.borrow_mut().ignore_comment = Some(format!("{}:ignore", CommentTriviaType::Diagnostic.as_str()));
         self
     }
 
     // codegen.ts:83 wrapForTypeChecker
-    pub fn wrap_for_type_checker(mut self) -> Self {
-        self.source = format!("({})", self.p());
-        self.span_comment = None;
-        self.identifier_comment = None;
-        self.ignore_comment = None;
+    pub fn wrap_for_type_checker(self) -> Self {
+        let source = format!("({})", self.p());
+        let mut state = self.0.borrow_mut();
+        state.source = source;
+        state.span_comment = None;
+        state.identifier_comment = None;
+        state.ignore_comment = None;
+        drop(state);
         self
     }
 
     // codegen.ts:93 addExpressionIdentifier
-    pub fn add_expression_identifier(mut self, identifier: ExpressionIdentifier, id: Option<u32>) -> Self {
+    pub fn add_expression_identifier(self, identifier: ExpressionIdentifier, id: Option<u32>) -> Self {
         let suffix = id.map(|id| format!(":{id}")).unwrap_or_default();
-        self.identifier_comment = Some(format!(
+        self.0.borrow_mut().identifier_comment = Some(format!(
             "{}:{}{suffix}",
             CommentTriviaType::ExpressionTypeIdentifier.as_str(),
             identifier.as_str()
