@@ -13,11 +13,21 @@
 //!
 //! Exit status: 0 with no errors, 1 with errors, 2 when it could not run.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ng_analyze::NgDiagnostic;
+use oxc_allocator::Allocator;
+
 use crate::ngtsc::diagnostics::{should_report_diagnostic, translate_diagnostic};
+use crate::ngp::compiler_options::NgpCompilerOptions;
+use crate::ngp::compiler_utils::TemplateParseOptions;
+use crate::ngp::file_analysis::FileCache;
+use crate::ngp::processor::{TypeCheckContext, type_check_file};
+use crate::ngp::tcb::{TcbTemplateSource, build_type_checking_config};
 use crate::ngtsc::tcb_util::TcbFile;
+use crate::typecheck::api::Map;
 use crate::typecheck::ops::codegen::SpanInfo;
 
 /// Where a type-check function's span comments index into (`TcbTemplateSource`, or the component's file)
@@ -189,27 +199,45 @@ fn run(args: &Args) -> Result<usize, String> {
 
 /// Analyzes the project with ng-analyze and generates each file's type-check block (`processor`)
 fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, String> {
+    let options = read_angular_options(tsconfig)?;
+    let tcb_config = build_type_checking_config(&options, false, false);
+    let template_parse_options = template_parse_options(&options);
     let (analyzer, files) = analyze(tsconfig)?;
+    let metadata_map: Map<String, ng_analyze::AnalysisResult> =
+        files.iter().map(|result| (result.file_path.clone(), result.clone())).collect();
+
+    // one allocator and file cache for the run: files share their dependencies' parsed templates
+    let allocator = Allocator::default();
+    let file_cache = RefCell::new(FileCache::default());
+    let ctx = TypeCheckContext {
+        allocator: &allocator,
+        analyzer: &analyzer,
+        tcb_config: &tcb_config,
+        file_cache: &file_cache,
+        template_parse_options: Some(&template_parse_options),
+        metadata_map: Some(&metadata_map),
+    };
     let mut generated = vec![];
     for result in &files {
         let path = PathBuf::from(&result.file_path);
+        let mut file = generate_file(&ctx, &path, result)?;
         // the analysis' own diagnostics (unsupported decorators, unresolvable metadata, ...)
-        let mut file = generate_file(&analyzer, result)?;
-        for d in &result.diagnostics {
-            let file_path = d.file_path.as_ref().map_or_else(|| path.clone(), PathBuf::from);
-            // ng-analyze's spans are JavaScript string (UTF-16) indices already
-            let start = d.span.as_ref().map_or(0, |span| span.start);
-            file.diagnostics.push(Diagnostic {
-                file: Some(file_path),
-                start,
-                code: format!("NG{}", d.code),
-                category: if d.category == 1 { Category::Error } else { Category::Warning },
-                message: d.message_text.clone(),
-            });
-        }
+        file.diagnostics.extend(result.diagnostics.iter().map(|d| diagnostic_of(d, &path)));
         generated.push((path, file));
     }
     Ok(generated)
+}
+
+/// An ng-analyze diagnostic, located in `default_file` when it names no file
+fn diagnostic_of(d: &NgDiagnostic, default_file: &Path) -> Diagnostic {
+    Diagnostic {
+        file: Some(d.file_path.as_ref().map_or_else(|| default_file.to_path_buf(), PathBuf::from)),
+        // ng-analyze's spans are JavaScript string (UTF-16) indices already
+        start: d.span.as_ref().map_or(0, |span| span.start),
+        code: format!("NG{}", d.code),
+        category: if d.category == 1 { Category::Error } else { Category::Warning },
+        message: d.message_text.clone(),
+    }
 }
 
 /// ng-analyze's analysis of the project: every file it compiles, with its metadata
@@ -232,11 +260,100 @@ fn analyze(tsconfig: &Path) -> Result<(ng_analyze::Analyzer, Vec<ng_analyze::Ana
 
 /// One file's type-check block and the diagnostics found making it (`processor`)
 fn generate_file(
-    _analyzer: &ng_analyze::Analyzer,
-    _result: &ng_analyze::AnalysisResult,
+    ctx: &TypeCheckContext<'_, '_>,
+    path: &Path,
+    result: &ng_analyze::AnalysisResult,
 ) -> Result<GeneratedFile, String> {
-    // wired to `crate::ngp::processor` once that port lands
-    Ok(GeneratedFile::default())
+    let content = ctx.analyzer.get_file_content_sync(&result.file_path)?;
+    let checked = type_check_file(ctx, &result.file_path, &content, result);
+    let template_sources = checked
+        .template_sources
+        .into_iter()
+        .map(|(id, source)| {
+            let source = match source {
+                TcbTemplateSource::TemplateFile(file) => TemplateSource::File(PathBuf::from(file)),
+                TcbTemplateSource::TemplateExpression { start, end } => {
+                    TemplateSource::Expression { file: path.to_path_buf(), span: SpanInfo { start, end } }
+                }
+            };
+            (id, source)
+        })
+        .collect();
+    Ok(GeneratedFile {
+        tcb: checked.text,
+        template_sources,
+        diagnostics: checked.diagnostics.iter().map(|d| diagnostic_of(d, path)).collect(),
+    })
+}
+
+/// The project's `angularCompilerOptions` over its `compilerOptions`, each merged along the `extends` chain, as
+/// `readConfiguration` gives them to ngtsc
+fn read_angular_options(tsconfig: &Path) -> Result<NgpCompilerOptions, String> {
+    let mut compiler_options = serde_json::Map::new();
+    let mut angular_options = serde_json::Map::new();
+    read_tsconfig_chain(tsconfig, &mut compiler_options, &mut angular_options, 0)?;
+    compiler_options.extend(angular_options);
+    serde_json::from_value(serde_json::Value::Object(compiler_options))
+        .map_err(|e| format!("{}: angularCompilerOptions: {e}", tsconfig.display()))
+}
+
+/// Merges `tsconfig`'s options into the maps, its bases' first (later `extends` entries override earlier ones, and the
+/// file's own options override them all)
+fn read_tsconfig_chain(
+    tsconfig: &Path,
+    compiler_options: &mut serde_json::Map<String, serde_json::Value>,
+    angular_options: &mut serde_json::Map<String, serde_json::Value>,
+    depth: usize,
+) -> Result<(), String> {
+    if depth > 32 {
+        return Err(format!("{}: tsconfig extends itself", tsconfig.display()));
+    }
+    let text = std::fs::read_to_string(tsconfig).map_err(|e| format!("{}: {e}", tsconfig.display()))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&strip_json_comments(&text)).map_err(|e| format!("{}: {e}", tsconfig.display()))?;
+    let dir = tsconfig.parent().unwrap_or(Path::new("."));
+    let bases = match json.get("extends") {
+        Some(serde_json::Value::String(base)) => vec![base.clone()],
+        Some(serde_json::Value::Array(bases)) => bases.iter().filter_map(|b| b.as_str().map(String::from)).collect(),
+        _ => vec![],
+    };
+    for base in bases {
+        let base_path = resolve_extends(dir, &base)
+            .ok_or_else(|| format!("{}: cannot find the tsconfig it extends, {base}", tsconfig.display()))?;
+        read_tsconfig_chain(&base_path, compiler_options, angular_options, depth + 1)?;
+    }
+    for (key, map) in [("compilerOptions", &mut *compiler_options), ("angularCompilerOptions", &mut *angular_options)] {
+        if let Some(serde_json::Value::Object(options)) = json.get(key) {
+            map.extend(options.clone());
+        }
+    }
+    Ok(())
+}
+
+/// An `extends` entry: a path relative to the extending file, or a package's file in the nearest `node_modules`
+fn resolve_extends(dir: &Path, spec: &str) -> Option<PathBuf> {
+    let with_json = |path: PathBuf| {
+        if path.is_file() {
+            return Some(path);
+        }
+        let json = PathBuf::from(format!("{}.json", path.display()));
+        if json.is_file() { Some(json) } else { Some(path.join("tsconfig.json")).filter(|p| p.is_file()) }
+    };
+    if spec.starts_with('.') || Path::new(spec).is_absolute() {
+        return with_json(dir.join(spec));
+    }
+    dir.ancestors().find_map(|ancestor| with_json(ancestor.join("node_modules").join(spec)))
+}
+
+/// hybrid_compiler.ts's `templateParseOptions`, from the project's options
+fn template_parse_options(options: &NgpCompilerOptions) -> TemplateParseOptions {
+    TemplateParseOptions {
+        preserve_whitespaces: Some(options.preserve_whitespaces.unwrap_or(false)),
+        preserve_significant_whitespace: Some(options.i18n_preserve_whitespace_for_legacy_extraction.unwrap_or(true)),
+        enable_i18n_legacy_message_id_format: Some(options.enable_i18n_legacy_message_id_format != Some(false)),
+        i18n_normalize_line_endings_in_icus: Some(options.i18n_normalize_line_endings_in_icus == Some(true)),
+        ..TemplateParseOptions::default()
+    }
 }
 
 /// tsrs from `@codecharm/tsrs` (its install links it to `bin/tsrs`) in the nearest `node_modules`, else `tsrs` on the

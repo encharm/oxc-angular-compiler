@@ -998,10 +998,9 @@ impl<'a> HtmlLexer<'a> {
         // Angular behavior: standalone `}` becomes BLOCK_CLOSE when:
         // - tokenize_blocks is true (default), AND
         // - We're not inside an expansion case or expansion form
-        // - We're not in escaped_string mode (where `}` may be part of `\u{...}` escape)
+        // (In escaped_string mode the cursor reads a `\u{...}` escape as one character, so a `}` here is a `}`.)
         if self.peek() == '}'
             && self.tokenize_blocks
-            && !self.escaped_string
             && !self.is_in_expansion_case()
             && !self.is_in_expansion_form()
         {
@@ -3080,11 +3079,10 @@ impl<'a> HtmlLexer<'a> {
             }
 
             // Stop at `}`:
-            // - When blocks are enabled (it becomes BLOCK_CLOSE) - unless we're in expansion or escaped_string
+            // - When blocks are enabled (it becomes BLOCK_CLOSE) - unless we're in expansion
             // - When we're in an expansion case (it ends the case)
             if ch == '}' {
                 if self.tokenize_blocks
-                    && !self.escaped_string
                     && !self.is_in_expansion_case()
                     && !self.is_in_expansion_form()
                 {
@@ -3404,6 +3402,17 @@ mod tests {
                 .iter()
                 .any(|t| t.token_type == HtmlTokenType::BlockOpenStart && t.value() == "if")
         );
+    }
+
+    #[test]
+    fn test_block_close_in_escaped_string() {
+        // An inline template, lexed as its string literal's raw text: `}` still closes the block. So does an escaped
+        // one (`\u{7d}`), as in Angular: the cursor reads it as the `}` the string's value holds.
+        for (input, closes) in [("@if (a) {<b></b>}", 1), ("<div>@if (a) {\n<b></b>\n}</div>", 1), ("@if (a) {\\u{7d}}", 2)] {
+            let tokens = HtmlLexer::new(input).with_escaped_string(true).tokenize().tokens;
+            let found = tokens.iter().filter(|t| t.token_type == HtmlTokenType::BlockClose).count();
+            assert_eq!(found, closes, "{input}");
+        }
     }
 
     #[test]
