@@ -42,8 +42,8 @@
 //! - `propDecorators` - Property decorators metadata
 
 use oxc_ast::ast::{
-    AssignmentTarget, BindingPattern, Class, ClassElement, Declaration, Expression, ObjectPropertyKind,
-    Program, PropertyKey, PropertyKind, Statement, VariableDeclarationKind,
+    AssignmentTarget, BindingPattern, Class, ClassElement, Declaration, Expression,
+    ObjectPropertyKind, Program, PropertyKey, PropertyKind, Statement, VariableDeclarationKind,
 };
 use oxc_span::{GetSpan, Span};
 use rustc_hash::FxHashSet;
@@ -113,7 +113,8 @@ impl AdjustStaticMembersTransformer {
             }
             // Like the Angular CLI's adjust-static-class-members: downleveled Angular statics after the class, or
             // static members inside it that are all safe to wrap
-            let wrap = !group.static_members.is_empty() || class_static_members_wrappable(group.class, &bindings, source);
+            let wrap = !group.static_members.is_empty()
+                || class_static_members_wrappable(group.class, &bindings, source);
             if wrap {
                 edits.extend(self.wrap_class_group(&group, source));
             }
@@ -122,7 +123,12 @@ impl AdjustStaticMembersTransformer {
     }
 
     /// Find groups of class declarations with their subsequent static member assignments.
-    fn find_class_groups<'a>(&self, program: &'a Program<'a>, bindings: &FxHashSet<&str>, source: &str) -> Vec<ClassGroup<'a>> {
+    fn find_class_groups<'a>(
+        &self,
+        program: &'a Program<'a>,
+        bindings: &FxHashSet<&str>,
+        source: &str,
+    ) -> Vec<ClassGroup<'a>> {
         let mut groups: Vec<ClassGroup<'a>> = Vec::new();
         let mut current: Option<ClassGroup<'a>> = None;
 
@@ -142,7 +148,9 @@ impl AdjustStaticMembersTransformer {
                     group.static_members.push(span);
                     group.end = span.end;
                 }
-                Some((member, span, value)) if can_wrap_property(member, value, bindings, source) => {
+                Some((member, span, value))
+                    if can_wrap_property(member, value, bindings, source) =>
+                {
                     group.end = span.end;
                 }
                 Some(_) => {
@@ -158,11 +166,23 @@ impl AdjustStaticMembersTransformer {
 
     /// The class a top-level statement declares, if any
     fn get_class_declaration_info<'a>(&self, stmt: &'a Statement<'a>) -> Option<ClassGroup<'a>> {
-        let group = |class_name, kind, class, start, end| ClassGroup { class_name, kind, class, start, static_members: Vec::new(), end, side_effects: false };
+        let group = |class_name, kind, class, start, end| ClassGroup {
+            class_name,
+            kind,
+            class,
+            start,
+            static_members: Vec::new(),
+            end,
+            side_effects: false,
+        };
         match stmt {
             Statement::VariableDeclaration(var_decl) if var_decl.declarations.len() == 1 => {
                 let decl = &var_decl.declarations[0];
-                let (BindingPattern::BindingIdentifier(ident), Some(Expression::ClassExpression(class))) = (&decl.id, &decl.init) else {
+                let (
+                    BindingPattern::BindingIdentifier(ident),
+                    Some(Expression::ClassExpression(class)),
+                ) = (&decl.id, &decl.init)
+                else {
                     return None;
                 };
                 let keyword = match var_decl.kind {
@@ -171,28 +191,52 @@ impl AdjustStaticMembersTransformer {
                     VariableDeclarationKind::Var => "var",
                     _ => return None,
                 };
-                Some(group(ident.name.as_str(), DeclarationKind::Variable(keyword), &**class, var_decl.span.start, var_decl.span.end))
+                Some(group(
+                    ident.name.as_str(),
+                    DeclarationKind::Variable(keyword),
+                    &**class,
+                    var_decl.span.start,
+                    var_decl.span.end,
+                ))
             }
             Statement::ClassDeclaration(class) => {
                 let ident = class.id.as_ref()?;
-                Some(group(ident.name.as_str(), DeclarationKind::Declaration, &**class, class.span.start, class.span.end))
+                Some(group(
+                    ident.name.as_str(),
+                    DeclarationKind::Declaration,
+                    &**class,
+                    class.span.start,
+                    class.span.end,
+                ))
             }
             Statement::ExportDeclaration(export) => {
                 let Declaration::ClassDeclaration(class) = &export.declaration else { return None };
                 let ident = class.id.as_ref()?;
-                Some(group(ident.name.as_str(), DeclarationKind::Declaration, &**class, class.span.start, class.span.end))
+                Some(group(
+                    ident.name.as_str(),
+                    DeclarationKind::Declaration,
+                    &**class,
+                    class.span.start,
+                    class.span.end,
+                ))
             }
             _ => None,
         }
     }
 
     /// Get the static member name if this is a static member assignment for the given class.
-    fn get_static_member_assignment<'a>(&self, stmt: &'a Statement<'a>, class_name: &str) -> Option<(&'a str, Span, &'a Expression<'a>)> {
+    fn get_static_member_assignment<'a>(
+        &self,
+        stmt: &'a Statement<'a>,
+        class_name: &str,
+    ) -> Option<(&'a str, Span, &'a Expression<'a>)> {
         let Statement::ExpressionStatement(expr_stmt) = stmt else { return None };
         let Expression::AssignmentExpression(assign) = &expr_stmt.expression else { return None };
         let AssignmentTarget::StaticMemberExpression(member) = &assign.left else { return None };
         match &member.object {
-            Expression::Identifier(obj) if obj.name.as_str() == class_name => Some((member.property.name.as_str(), expr_stmt.span, &assign.right)),
+            Expression::Identifier(obj) if obj.name.as_str() == class_name => {
+                Some((member.property.name.as_str(), expr_stmt.span, &assign.right))
+            }
             _ => None,
         }
     }
@@ -206,7 +250,9 @@ impl AdjustStaticMembersTransformer {
         };
         let mut end = group.end;
         // a variable statement keeps its own `;` inside the arrow function
-        let tail = if source.as_bytes().get(end as usize - 1) == Some(&b';') || group.kind == DeclarationKind::Declaration {
+        let tail = if source.as_bytes().get(end as usize - 1) == Some(&b';')
+            || group.kind == DeclarationKind::Declaration
+        {
             format!("\n  return {name};\n}})();")
         } else {
             format!(";\n  return {name};\n}})();")
@@ -267,7 +313,11 @@ fn top_level_bindings<'a>(program: &'a Program<'a>) -> FxHashSet<&'a str> {
 /// The Angular CLI's `analyzeClassStaticProperties`: every static property, and every static block assigning
 /// `this.<name> = …`, holds an Angular definition or a value without side effects. Static blocks of more than one
 /// statement, computed keys, and assignments to anything but `this` are not wrapped.
-fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>, source: &str) -> bool {
+fn class_static_members_wrappable(
+    class: &Class<'_>,
+    bindings: &FxHashSet<&str>,
+    source: &str,
+) -> bool {
     let mut should_wrap = false;
     for element in &class.body.body {
         match element {
@@ -280,7 +330,11 @@ fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>,
                 };
                 match &prop.value {
                     None => should_wrap = true,
-                    Some(value) if can_wrap_property(key.name.as_str(), value, bindings, source) => should_wrap = true,
+                    Some(value)
+                        if can_wrap_property(key.name.as_str(), value, bindings, source) =>
+                    {
+                        should_wrap = true
+                    }
                     Some(_) => return false,
                 }
             }
@@ -288,10 +342,16 @@ fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>,
                 if block.body.len() > 1 {
                     return false;
                 }
-                let Some(Statement::ExpressionStatement(stmt)) = block.body.first() else { continue };
+                let Some(Statement::ExpressionStatement(stmt)) = block.body.first() else {
+                    continue;
+                };
                 let Expression::AssignmentExpression(assign) = &stmt.expression else { continue };
                 let AssignmentTarget::StaticMemberExpression(member) = &assign.left else {
-                    if matches!(assign.left, AssignmentTarget::ComputedMemberExpression(_) | AssignmentTarget::PrivateFieldExpression(_)) {
+                    if matches!(
+                        assign.left,
+                        AssignmentTarget::ComputedMemberExpression(_)
+                            | AssignmentTarget::PrivateFieldExpression(_)
+                    ) {
                         return false;
                     }
                     continue;
@@ -299,7 +359,8 @@ fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>,
                 if !matches!(member.object, Expression::ThisExpression(_)) {
                     return false;
                 }
-                if can_wrap_property(member.property.name.as_str(), &assign.right, bindings, source) {
+                if can_wrap_property(member.property.name.as_str(), &assign.right, bindings, source)
+                {
                     should_wrap = true;
                 } else {
                     return false;
@@ -312,8 +373,15 @@ fn class_static_members_wrappable(class: &Class<'_>, bindings: &FxHashSet<&str>,
 }
 
 /// The Angular CLI's `canWrapProperty`: an Angular definition, a value marked pure, or a pure expression
-fn can_wrap_property(name: &str, value: &Expression<'_>, bindings: &FxHashSet<&str>, source: &str) -> bool {
-    ANGULAR_STATICS_TO_WRAP.contains(&name) || has_pure_annotation(value.span(), source) || is_pure(value, bindings)
+fn can_wrap_property(
+    name: &str,
+    value: &Expression<'_>,
+    bindings: &FxHashSet<&str>,
+    source: &str,
+) -> bool {
+    ANGULAR_STATICS_TO_WRAP.contains(&name)
+        || has_pure_annotation(value.span(), source)
+        || is_pure(value, bindings)
 }
 
 /// A `/* @__PURE__ */`, `/* #__PURE__ */` or `@pureOrBreakMyCode` comment right before the expression
@@ -322,7 +390,9 @@ fn has_pure_annotation(span: Span, source: &str) -> bool {
     let Some(body) = before.strip_suffix("*/") else { return false };
     let Some(open) = body.rfind("/*") else { return false };
     let comment = &body[open..];
-    comment.contains("@__PURE__") || comment.contains("#__PURE__") || comment.contains("@pureOrBreakMyCode")
+    comment.contains("@__PURE__")
+        || comment.contains("#__PURE__")
+        || comment.contains("@pureOrBreakMyCode")
 }
 
 /// Babel's `scope.isPure`, for what static members hold: literals, functions, classes, bound identifiers, and
@@ -347,18 +417,25 @@ fn is_pure(expr: &Expression<'_>, bindings: &FxHashSet<&str>) -> bool {
         Expression::ObjectExpression(o) => o.properties.iter().all(|p| match p {
             ObjectPropertyKind::SpreadProperty(_) => false,
             ObjectPropertyKind::ObjectProperty(prop) => {
-                let key_pure = !prop.computed || prop.key.as_expression().is_some_and(|k| is_pure(k, bindings));
-                key_pure && (prop.method || matches!(prop.kind, PropertyKind::Init)) && (prop.method || is_pure(&prop.value, bindings))
+                let key_pure = !prop.computed
+                    || prop.key.as_expression().is_some_and(|k| is_pure(k, bindings));
+                key_pure
+                    && (prop.method || matches!(prop.kind, PropertyKind::Init))
+                    && (prop.method || is_pure(&prop.value, bindings))
             }
         }),
         Expression::UnaryExpression(u) => is_pure(&u.argument, bindings),
-        Expression::BinaryExpression(b) => is_pure(&b.left, bindings) && is_pure(&b.right, bindings),
+        Expression::BinaryExpression(b) => {
+            is_pure(&b.left, bindings) && is_pure(&b.right, bindings)
+        }
         Expression::ParenthesizedExpression(p) => is_pure(&p.expression, bindings),
         Expression::ClassExpression(c) => {
             c.heritage.as_ref().is_none_or(|h| is_pure(&h.expression, bindings))
                 && c.body.body.iter().all(|el| match el {
                     ClassElement::MethodDefinition(m) => !m.computed,
-                    ClassElement::PropertyDefinition(p) => !p.computed && p.value.as_ref().is_none_or(|v| is_pure(v, bindings)),
+                    ClassElement::PropertyDefinition(p) => {
+                        !p.computed && p.value.as_ref().is_none_or(|v| is_pure(v, bindings))
+                    }
                     _ => false,
                 })
         }
@@ -452,15 +529,27 @@ MyService.ɵfac = (t) => new (t || MyService)();"#;
 }
 export { ButtonComponent };"#;
         let result = transform(code);
-        assert!(result.starts_with("let ButtonComponent = /* @__PURE__ */ (() => {\nclass ButtonComponent {"), "{result}");
-        assert!(result.contains("return ButtonComponent;\n})();\nexport { ButtonComponent };"), "{result}");
+        assert!(
+            result.starts_with(
+                "let ButtonComponent = /* @__PURE__ */ (() => {\nclass ButtonComponent {"
+            ),
+            "{result}"
+        );
+        assert!(
+            result.contains("return ButtonComponent;\n})();\nexport { ButtonComponent };"),
+            "{result}"
+        );
     }
 
     #[test]
     fn wraps_exported_class_declarations() {
-        let code = "export class A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}";
+        let code =
+            "export class A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}";
         let result = transform(code);
-        assert_eq!(result, "export let A = /* @__PURE__ */ (() => {\nclass A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}\n  return A;\n})();");
+        assert_eq!(
+            result,
+            "export let A = /* @__PURE__ */ (() => {\nclass A {\n    static { this.ɵprov = i0.ɵɵdefineInjectable({ token: A }); }\n}\n  return A;\n})();"
+        );
     }
 
     /// Deepkit's runtime type: an array of strings and functions
