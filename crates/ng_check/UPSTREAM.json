@@ -252,6 +252,12 @@
       "path": "vendor/ng-analyze",
       "omit": [
         "BUILD.bazel"
+      ],
+      "patches": [
+        {
+          "file": "crates/ng_check/patches/ng-analyze-inheritance-order.patch",
+          "why": "flatten inherited metadata base class first, as ngtsc's flattenInheritedDirectiveMetadata: the type-check blocks list inputs in that order"
+        }
       ]
     }
   ]

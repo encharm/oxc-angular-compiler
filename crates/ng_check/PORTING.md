@@ -23,11 +23,15 @@ file. Above each ported function, type or method: `// <file>.ts:<line> <name>` (
 | `packages/compiler/src/typecheck/**` (the TCB generator) | `src/typecheck/**` |
 | `packages/compiler-cli/preprocessor/src/` (`tcb.ts`, `tcb_adapter.ts`, ...: from ng-analyze's metadata to the generator) | `src/ngp/` |
 | `packages/compiler-cli/src/ngtsc/typecheck/src/diagnostics.ts`, `tcb_util.ts`, `comments.ts` (mapping TCB diagnostics back) | `src/ngtsc/` |
-| `packages/compiler-cli/preprocessor/ng-analyze` | `vendor/ng-analyze`, unmodified |
+| `packages/compiler-cli/preprocessor/ng-analyze` | `vendor/ng-analyze`, with the patches in `patches/` |
 
 `UPSTREAM.json` lists every ported file. `node tools/ng-check-upstream.mjs status <commit>` shows which of them
 changed between the pinned commit and `<commit>`, with their diffs: port those, then update the pin and
-`vendor/ng-analyze` (`node tools/ng-check-upstream.mjs vendor <commit>`).
+`vendor/ng-analyze` (`node tools/ng-check-upstream.mjs vendor <commit>`, which also applies `patches/`).
+
+`patches/` holds our changes to ng-analyze, each listed with its reason in `UPSTREAM.json` (`vendored[].patches`):
+they make its metadata match ngtsc's where the type-check blocks depend on it. A patch that stops applying makes
+`vendor` fail; port the change to the new code and rewrite the patch with `git diff -- vendor/ng-analyze`.
 
 ## Conventions
 

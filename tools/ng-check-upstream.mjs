@@ -1,7 +1,8 @@
 // Keeps crates/ng_check in step with Angular (crates/ng_check/PORTING.md).
 //
 //   node tools/ng-check-upstream.mjs status <commit>   which ported files changed since the pinned commit, with diffs
-//   node tools/ng-check-upstream.mjs vendor <commit>   replace vendor/ng-analyze with Angular's at <commit>
+//   node tools/ng-check-upstream.mjs vendor <commit>   replace vendor/ng-analyze with Angular's at <commit>, then apply
+//                                                      our patches to it (UPSTREAM.json `vendored[].patches`)
 //   node tools/ng-check-upstream.mjs pin <commit>      record <commit> as the one the port matches
 //
 // <commit> is any angular/angular commit, tag or branch. Files come from GitHub; `git` and `diff` must be installed.
@@ -54,7 +55,7 @@ if (command === 'status' && target) {
   console.log(`\n${changed} of ${manifest.files.length} ported files changed between ${pinned.slice(0, 10)} and ${target}.`);
   console.log('Also compare the TypeScript files these import, and run the differential test (PORTING.md, Testing).');
 } else if (command === 'vendor' && target) {
-  for (const {upstream, path, omit = []} of manifest.vendored) {
+  for (const {upstream, path, omit = [], patches = []} of manifest.vendored) {
     const {dir, sha} = checkout(target, [upstream]);
     const dest = join(root, path);
     rmSync(dest, {recursive: true, force: true});
@@ -62,6 +63,14 @@ if (command === 'status' && target) {
     for (const name of omit) rmSync(join(dest, name), {force: true});
     rmSync(dir, {recursive: true, force: true});
     console.log(`${path}: ${upstream} at ${sha.slice(0, 10)}`);
+    for (const {file} of patches) {
+      const applied = spawnSync('git', ['apply', file], {cwd: root, encoding: 'utf8'});
+      if (applied.status !== 0) {
+        console.error(`${file} no longer applies to ${path}:\n${applied.stderr}Port the change by hand, then rewrite the patch: git diff -- ${path} > ${file}`);
+        process.exit(1);
+      }
+      console.log(`  patched: ${file}`);
+    }
   }
 } else if (command === 'pin' && target) {
   const {dir, sha} = checkout(target, ['packages/compiler/src/typecheck']);
