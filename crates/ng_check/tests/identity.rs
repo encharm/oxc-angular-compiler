@@ -1,6 +1,6 @@
-//! Node identity is the node's address (`t2_api::node_key`). A node stored inline in its parent (not boxed) would
-//! share its parent's address at offset 0, and the two would be one node to every map keyed by it. These are the
-//! nodes keyed that way; their addresses must differ from their parents'.
+//! Node identity (`t2_api::node_key`) is the node's address and type. A node stored inline at the start of its parent
+//! (not boxed) has its parent's address, as a @for block's item variable does; the type keeps their keys apart.
+//! These are the nodes stored inline and keyed: their keys must differ from their parents'.
 
 use ng_check::angular::t2_api::node_key;
 use ng_check::ngp::compiler_utils::{TemplateParseOptions, parse_template};
