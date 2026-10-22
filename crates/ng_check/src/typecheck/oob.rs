@@ -5,8 +5,8 @@ use oxc_angular_compiler::ast::expression::{AngularExpression, BindingPipe, Prop
 use oxc_angular_compiler::ast::r3::{
     R3BoundAttribute, R3BoundEvent, R3Component, R3Directive, R3Element, R3ForLoopBlock,
     R3ForLoopBlockEmpty, R3HoverDeferredTrigger, R3IfBlockBranch, R3InteractionDeferredTrigger,
-    R3LetDeclaration, R3Reference, R3SwitchBlockCase, R3Template, R3TextAttribute, R3Variable,
-    R3ViewportDeferredTrigger,
+    R3LetDeclaration, R3Reference, R3SwitchBlockCase, R3SwitchBlockCaseGroup, R3Template, R3TextAttribute,
+    R3Variable, R3ViewportDeferredTrigger,
 };
 
 use crate::typecheck::api::{TcbDirectiveMetadata, TypeCheckId};
@@ -42,11 +42,15 @@ pub enum ComponentOrDirective<'a> {
 }
 
 /// `IfBlockBranch | SwitchBlockCase | ForLoopBlock | ForLoopBlockEmpty | BoundaryBlock` (Angular's `BoundaryBlock` is
-/// not in the fork's AST)
+/// not in the fork's AST).
+///
+/// `TcbControlFlowContentProjectionOp` passes a `SwitchBlockCaseGroup` (which TypeScript accepts structurally, as a
+/// `ForLoopBlockEmpty`), hence that variant.
 #[derive(Debug, Clone, Copy)]
 pub enum ControlFlowNode<'a> {
     IfBlockBranch(&'a R3IfBlockBranch<'a>),
     SwitchBlockCase(&'a R3SwitchBlockCase<'a>),
+    SwitchBlockCaseGroup(&'a R3SwitchBlockCaseGroup<'a>),
     ForLoopBlock(&'a R3ForLoopBlock<'a>),
     ForLoopBlockEmpty(&'a R3ForLoopBlockEmpty<'a>),
 }
