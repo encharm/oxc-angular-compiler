@@ -330,7 +330,7 @@ pub(crate) mod test_support {
     use oxc_allocator::Allocator;
     use oxc_angular_compiler::ast::expression::{AngularExpression, BindingPipe, PropertyRead};
     use oxc_angular_compiler::ast::r3::{
-        R3BoundAttribute, R3BoundEvent, R3DeferredBlock, R3DeferredTrigger, R3Directive, R3Element,
+        R3BoundAttribute, R3BoundEvent, R3DeferredBlock, R3Directive, R3Element,
         R3ForLoopBlock, R3HostElement, R3LetDeclaration, R3Node, R3Reference, R3Variable,
     };
     use oxc_angular_compiler::parser::ParseTemplateOptions;

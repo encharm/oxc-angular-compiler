@@ -8,6 +8,7 @@ use rustc_hash::FxBuildHasher;
 use crate::angular::core::SchemaMetadata;
 use crate::angular::property_mapping::{AsInputOrOutput, ClassPropertyMapping, ClassPropertyName, InputOrOutput};
 use crate::angular::t2_api::{BoundTarget, DirectiveMeta, LegacyAnimationTriggerNames, MatchSource};
+use crate::angular::t2_binder::DirectiveSpread;
 use crate::typecheck::ops::codegen::{SpanInfo, TcbExpr};
 
 pub type Set<T> = IndexSet<T, FxBuildHasher>;
@@ -173,6 +174,17 @@ impl DirectiveMeta for TcbDirectiveMetadata {
     }
     fn match_source(&self) -> MatchSource {
         self.match_source
+    }
+}
+
+/// `{...dir, inputs, outputs}` (t2_binder.ts:818), for the binder's host directive merging.
+impl DirectiveSpread for TcbDirectiveMetadata {
+    fn with_mappings(
+        &self,
+        inputs: ClassPropertyMapping<TcbInputMapping>,
+        outputs: ClassPropertyMapping<InputOrOutput>,
+    ) -> Self {
+        Self { inputs, outputs, ..self.clone() }
     }
 }
 
