@@ -45,7 +45,8 @@ use oxc_ast::ast::{
     BindingIdentifier, ClassElement, Expression, ImportDeclarationSpecifier, MethodDefinitionKind,
     Program, Statement, StringLiteral, TSType,
 };
-use oxc_semantic::{Semantic, SemanticBuilder, SymbolFlags};
+use oxc_ast_visit::Visit;
+use oxc_semantic::{ReferenceId, Semantic, SemanticBuilder, SymbolFlags};
 use oxc_str::Ident;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -107,6 +108,14 @@ impl<'a> ImportElisionAnalyzer<'a> {
         } else {
             Self::collect_ctor_param_decorator_only_imports(program, &consts)
         };
+        // The references inside decorators compilation removes: a name is decorator-only when every value
+        // reference to it is one of them, wherever else in the file the walk above didn't look (an exported const,
+        // a function, ...)
+        let removed_references = if emit_metadata {
+            FxHashSet::default()
+        } else {
+            Self::removed_decorator_references(program, &consts)
+        };
 
         // Analyze each import declaration
         for stmt in &program.body {
@@ -151,7 +160,13 @@ impl<'a> ImportElisionAnalyzer<'a> {
                             type_only_specifiers.insert(name.clone());
                         }
                         // Check if this import is only used in constructor parameter decorators
-                        else if ctor_param_decorator_only.contains(name.as_str()) {
+                        else if ctor_param_decorator_only.contains(name.as_str())
+                            && Self::value_references_only_among(
+                                &spec.local,
+                                semantic,
+                                &removed_references,
+                            )
+                        {
                             type_only_specifiers.insert(name.clone());
                         }
                     }
@@ -877,6 +892,91 @@ impl<'a> ImportElisionAnalyzer<'a> {
             .any(|reference| !reference.is_type());
 
         !has_value_reference
+    }
+
+    /// Whether every value reference to an import binding is one of `references`
+    fn value_references_only_among(
+        id: &BindingIdentifier<'a>,
+        semantic: &Semantic<'a>,
+        references: &FxHashSet<ReferenceId>,
+    ) -> bool {
+        let scoping = semantic.scoping();
+        scoping.get_resolved_reference_ids(id.symbol_id()).iter().all(|&reference| {
+            scoping.get_reference(reference).is_type() || references.contains(&reference)
+        })
+    }
+
+    /// The references inside the decorators compilation removes: Angular's constructor parameter decorators of the
+    /// classes [`Self::collect_ctor_param_decorator_only_imports`] looks at, and the decorators of `declare`
+    /// properties
+    fn removed_decorator_references(
+        program: &'a Program<'a>,
+        consts: &crate::directive::StringConsts<'a>,
+    ) -> FxHashSet<ReferenceId> {
+        #[derive(Default)]
+        struct References(FxHashSet<ReferenceId>);
+        impl<'a> Visit<'a> for References {
+            fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
+                if let Some(reference) = it.reference_id.get() {
+                    self.0.insert(reference);
+                }
+            }
+        }
+        let mut references = References::default();
+        for stmt in &program.body {
+            let class = match stmt {
+                Statement::ClassDeclaration(class) => class,
+                Statement::ExportDefaultDeclaration(export) => match &export.declaration {
+                    oxc_ast::ast::ExportDefaultDeclarationKind::ClassDeclaration(class) => class,
+                    _ => continue,
+                },
+                Statement::ExportDeclaration(export) => match &export.declaration {
+                    oxc_ast::ast::Declaration::ClassDeclaration(class) => class,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            for element in &class.body.body {
+                match element {
+                    ClassElement::MethodDefinition(method)
+                        if method.kind == MethodDefinitionKind::Constructor =>
+                    {
+                        for param in &method.value.params.items {
+                            for decorator in &param.decorators {
+                                if Self::is_removed_param_decorator(decorator, consts) {
+                                    references.visit_decorator(decorator);
+                                }
+                            }
+                        }
+                    }
+                    ClassElement::PropertyDefinition(prop) if prop.declare => {
+                        for decorator in &prop.decorators {
+                            references.visit_decorator(decorator);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        references.0
+    }
+
+    /// One of Angular's constructor parameter decorators (`@Inject(TOKEN)`, `@Optional()`, ...), which compilation
+    /// removes; another module's `@Inject` stays in the output (like ngtsc)
+    fn is_removed_param_decorator(
+        decorator: &'a oxc_ast::ast::Decorator<'a>,
+        consts: &crate::directive::StringConsts<'a>,
+    ) -> bool {
+        let name = match &decorator.expression {
+            Expression::Identifier(id) => id.name.as_str(),
+            Expression::CallExpression(call) => match &call.callee {
+                Expression::Identifier(id) => id.name.as_str(),
+                _ => return false,
+            },
+            _ => return false,
+        };
+        PARAM_DECORATORS.contains(&name)
+            && crate::directive::angular_param_decorator(decorator, Some(consts)).is_some()
     }
 
     /// The number of value references to an import binding, or `usize::MAX`
@@ -1835,6 +1935,39 @@ export class BitLabelComponent {
             type_only.contains("FormControlComponent"),
             "FormControlComponent should be elided (type annotation)"
         );
+    }
+
+    #[test]
+    fn test_inject_token_used_elsewhere_in_the_file_is_kept() {
+        // `@Inject(TOKEN)` is removed, but TOKEN is also a value elsewhere in the file: an exported const, a
+        // function, a nested scope. Each needs the import.
+        for elsewhere in [
+            "export const providers = [{ provide: TOKEN, useValue: 1 }];",
+            "export function token() { return TOKEN; }",
+            "function token() { return TOKEN; }",
+            "export default [TOKEN];",
+            "if (true) { console.log(TOKEN); }",
+            "export class Other { static token = TOKEN; }",
+        ] {
+            let source = format!(
+                r#"
+import {{ Injectable, Inject }} from "@angular/core";
+import {{ TOKEN }} from "./tokens";
+
+@Injectable()
+export class TestService {{
+    constructor(@Inject(TOKEN) private value: unknown) {{}}
+}}
+{elsewhere}
+"#
+            );
+            let type_only = analyze_source(&source);
+            assert!(
+                !type_only.contains("TOKEN"),
+                "TOKEN must be kept when the file has `{elsewhere}`"
+            );
+            assert!(type_only.contains("Inject"), "Inject is still elided with `{elsewhere}`");
+        }
     }
 
     #[test]
