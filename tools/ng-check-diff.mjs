@@ -9,7 +9,9 @@
 // numbers every component and generates a whole file inline when one of its components needs it. In such a file
 // (it holds the component's own source) names are unqualified, so import qualifiers (`i1.`) are dropped from both
 // sides. Imports are not compared: ngtsc writes module specifiers relative to absolute paths, ngcheck the sources'
-// own specifiers (as Angular's prototype does); both name the same files. Exit status 1 when a function differs.
+// own specifiers (as Angular's prototype does); both name the same files. Their aliases are numbered by each tool's
+// environment (ngtsc's, or the prototype's that ngcheck follows), so a function equal once each side's aliases are
+// renumbered by first use counts as "identical but for import numbering". Exit status 1 when a function differs.
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import {join, relative} from 'node:path';
 
@@ -30,7 +32,16 @@ function* walk(dir) {
   }
 }
 
-let files = 0, same = 0, differ = 0, missing = 0, extra = 0;
+// `i<n>.` aliases renumbered in order of first use
+const renumbered = (body) => {
+  const order = new Map();
+  return body.replace(/\bi(\d+)\./g, (_, n) => {
+    if (!order.has(n)) order.set(n, order.size);
+    return `i${order.get(n)}.`;
+  });
+};
+
+let files = 0, same = 0, sameButImports = 0, differ = 0, missing = 0, extra = 0;
 const shown = [];
 for (const oraclePath of walk(oracleDir)) {
   const rel = relative(oracleDir, oraclePath);
@@ -56,6 +67,8 @@ for (const oraclePath of walk(oracleDir)) {
       if (shown.length < show) shown.push(`MISSING ${rel} ${name}`);
     } else if (strip(ours) === strip(body)) {
       same++;
+    } else if (renumbered(strip(ours)) === renumbered(strip(body))) {
+      sameButImports++;
     } else {
       differ++;
       if (shown.length < show) {
@@ -68,5 +81,8 @@ for (const oraclePath of walk(oracleDir)) {
   for (const name of actual.keys()) if (!expected.has(name)) extra++;
 }
 for (const s of shown) console.log(s);
-console.log(`\n${files} files: ${same} functions identical, ${differ} differ, ${missing} missing, ${extra} extra`);
+console.log(
+  `\n${files} files: ${same} functions identical, ${sameButImports} identical but for import numbering, ${differ} differ, ` +
+    `${missing} missing, ${extra} extra`,
+);
 process.exit(differ + missing + extra > 0 ? 1 : 0);
