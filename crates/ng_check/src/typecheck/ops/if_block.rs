@@ -6,7 +6,7 @@ use std::cell::RefCell;
 
 use oxc_angular_compiler::ast::r3::{R3IfBlock, R3IfBlockBranch};
 
-use crate::angular::t2_api::{ScopedNode, node_key};
+use crate::angular::t2_api::{NodeKey, ScopedNode, node_key};
 use crate::typecheck::api::Map;
 use crate::typecheck::ops::base::{ScopeRef, TcbOp, TcbRef};
 use crate::typecheck::ops::codegen::{TcbExpr, get_statements_block};
@@ -18,7 +18,7 @@ use crate::typecheck::ops::references::LocalSymbol;
 // Executing this operation returns nothing.
 pub struct TcbIfBlockOp<'a, 'b> {
     /// By the branch's `node_key`
-    expression_scopes: RefCell<Map<usize, ScopeRef<'a, 'b>>>,
+    expression_scopes: RefCell<Map<NodeKey, ScopeRef<'a, 'b>>>,
     tcb: TcbRef<'a, 'b>,
     scope: ScopeRef<'a, 'b>,
     block: &'a R3IfBlock<'a>,

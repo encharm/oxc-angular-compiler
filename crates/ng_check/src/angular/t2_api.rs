@@ -20,14 +20,23 @@ use rustc_hash::FxBuildHasher;
 
 use crate::angular::property_mapping::{AsInputOrOutput, ClassPropertyMapping, InputOrOutput};
 
-/// The identity of a template AST node: its address (the struct inside its `Box`).
-pub fn node_key<T>(node: &T) -> usize {
-    std::ptr::from_ref(node) as usize
+/// The identity of a template AST node or expression (`node_key`, `expr_key`): its address and its type. The type
+/// matters for a node stored inline at the start of its parent (a `@for` block's `item` variable), which has its
+/// parent's address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeKey {
+    address: usize,
+    r#type: &'static str,
+}
+
+/// The identity of a template AST node: its address (the struct inside its `Box`) and type.
+pub fn node_key<T>(node: &T) -> NodeKey {
+    NodeKey { address: std::ptr::from_ref(node) as usize, r#type: std::any::type_name::<T>() }
 }
 
 /// The identity of an expression: the address of its variant's boxed struct, so that a `&AngularExpression` and the
 /// struct it boxes (`&PropertyRead`) have the same key.
-pub fn expr_key(expr: &AngularExpression<'_>) -> usize {
+pub fn expr_key(expr: &AngularExpression<'_>) -> NodeKey {
     use AngularExpression as E;
     match expr {
         E::Empty(b) => node_key(&**b),
@@ -96,7 +105,7 @@ pub enum ScopedNode<'a> {
 }
 
 impl ScopedNode<'_> {
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> NodeKey {
         match self {
             Self::Template(n) => node_key(*n),
             Self::SwitchBlockCaseGroup(n) => node_key(*n),
@@ -123,7 +132,7 @@ pub enum TemplateEntity<'a> {
 }
 
 impl TemplateEntity<'_> {
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> NodeKey {
         match self {
             Self::Reference(n) => node_key(*n),
             Self::Variable(n) => node_key(*n),
@@ -144,7 +153,7 @@ pub enum DirectiveOwner<'a> {
 }
 
 impl DirectiveOwner<'_> {
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> NodeKey {
         match self {
             Self::Element(n) => node_key(*n),
             Self::Template(n) => node_key(*n),
@@ -182,7 +191,7 @@ pub enum Binding<'a> {
 }
 
 impl Binding<'_> {
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> NodeKey {
         match self {
             Self::BoundAttribute(n) => node_key(*n),
             Self::BoundEvent(n) => node_key(*n),

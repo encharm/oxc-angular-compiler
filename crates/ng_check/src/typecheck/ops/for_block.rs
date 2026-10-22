@@ -6,7 +6,7 @@ use oxc_angular_compiler::ast::expression::{ASTWithSource, AngularExpression};
 use oxc_angular_compiler::ast::r3::R3ForLoopBlock;
 use oxc_span::Span;
 
-use crate::angular::t2_api::{ScopedNode, TemplateEntity, node_key};
+use crate::angular::t2_api::{NodeKey, ScopedNode, TemplateEntity, node_key};
 use crate::typecheck::api::Set;
 use crate::typecheck::ops::base::{ScopeRef, TcbOp, TcbRef};
 use crate::typecheck::ops::codegen::{TcbExpr, get_statements_block};
@@ -99,7 +99,7 @@ pub struct TcbForLoopTrackTranslator<'a, 'b> {
     scope: ScopeRef<'a, 'b>,
     block: &'a R3ForLoopBlock<'a>,
     /// By `node_key`
-    allowed_variables: Set<usize>,
+    allowed_variables: Set<NodeKey>,
 }
 
 impl<'a, 'b> TcbForLoopTrackTranslator<'a, 'b> {
@@ -111,7 +111,7 @@ impl<'a, 'b> TcbForLoopTrackTranslator<'a, 'b> {
     ) -> Self {
         // Tracking expressions are only allowed to read the `$index`,
         // the item and properties off the component instance.
-        let mut allowed_variables: Set<usize> = Set::default();
+        let mut allowed_variables: Set<NodeKey> = Set::default();
         allowed_variables.insert(node_key(&block.item));
         for variable in &block.context_variables {
             if variable.value == "$index" {

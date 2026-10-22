@@ -758,7 +758,7 @@ pub(crate) mod test_support {
     /// A bound target that knows the consumers of bindings (by `Binding::key`) and nothing else
     pub struct Bound<'a> {
         pub target: Target<'a, DirectiveRef>,
-        pub consumers: RefCell<Vec<(usize, BindingConsumer<'a, DirectiveRef>)>>,
+        pub consumers: RefCell<Vec<(crate::angular::t2_api::NodeKey, BindingConsumer<'a, DirectiveRef>)>>,
     }
 
     impl Default for Bound<'_> {

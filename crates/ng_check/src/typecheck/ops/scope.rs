@@ -20,6 +20,7 @@ use oxc_angular_compiler::parser::html::split_ns_name;
 
 use crate::angular::directive_matching::CssSelector;
 use crate::angular::t2_api::{
+    NodeKey,
     DirectiveOwner, ReferenceDeferredTrigger, ReferenceTarget, ScopedNode, TemplateEntity, node_key,
 };
 use crate::typecheck::api::{DiagnosticCategoryLabel, DirectiveKey, DirectiveRef, Map, Set};
@@ -106,29 +107,29 @@ pub struct Scope<'a, 'b> {
     op_queue: RefCell<Vec<OpSlot<'a, 'b>>>,
 
     /// A map of `Element`s to the index of their `TcbElementOp` in the `opQueue`
-    element_op_map: RefCell<Map<usize, usize>>,
+    element_op_map: RefCell<Map<NodeKey, usize>>,
 
     /// A map of `HostElement`s to the index of their `TcbHostElementOp` in the `opQueue`
-    host_element_op_map: RefCell<Map<usize, usize>>,
+    host_element_op_map: RefCell<Map<NodeKey, usize>>,
 
     /// A map of `Component`s to the index of their `TcbComponentNodeOp` in the `opQueue`
-    component_node_op_map: RefCell<Map<usize, usize>>,
+    component_node_op_map: RefCell<Map<NodeKey, usize>>,
 
     /// A map of maps which tracks the index of `TcbDirectiveCtorOp`s in the `opQueue` for each
     /// directive on a `Element` or `Template` node.
     directive_op_map: RefCell<Map<DirectiveOwner<'a>, Map<DirectiveKey, usize>>>,
 
     /// A map of `Reference`s to the index of their `TcbReferenceOp` in the `opQueue`
-    reference_op_map: RefCell<Map<usize, (&'a R3Reference<'a>, usize)>>,
+    reference_op_map: RefCell<Map<NodeKey, (&'a R3Reference<'a>, usize)>>,
 
     /// Map of immediately nested <ng-template>s (within this `Scope`) represented by `Template`
     /// nodes to the index of their `TcbTemplateContextOp`s in the `opQueue`.
-    template_ctx_op_map: RefCell<Map<usize, usize>>,
+    template_ctx_op_map: RefCell<Map<NodeKey, usize>>,
 
     /// Map of variables declared on the template that created this `Scope` (represented by
     /// `Variable` nodes) to the index of their `TcbVariableOp`s in the `opQueue`, or to
     /// pre-resolved variable identifiers.
-    var_map: RefCell<Map<usize, (&'a R3Variable<'a>, VarSlot)>>,
+    var_map: RefCell<Map<NodeKey, (&'a R3Variable<'a>, VarSlot)>>,
 
     /// A map of the names of `LetDeclaration`s to the index of their op in the `opQueue`.
     ///

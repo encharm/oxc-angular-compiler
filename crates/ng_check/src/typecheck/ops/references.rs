@@ -5,7 +5,7 @@ use oxc_angular_compiler::ast::r3::{
     R3Variable,
 };
 
-use crate::angular::t2_api::{DirectiveOwner, TemplateEntity, node_key};
+use crate::angular::t2_api::{DirectiveOwner, NodeKey, TemplateEntity, node_key};
 use crate::typecheck::api::DirectiveRef;
 use crate::typecheck::ops::base::{ScopeRef, TcbOp, TcbRef};
 use crate::typecheck::ops::codegen::TcbExpr;
@@ -25,7 +25,7 @@ pub enum LocalSymbol<'a> {
 
 impl<'a> LocalSymbol<'a> {
     /// The node's identity (`t2_api::node_key`)
-    pub fn key(&self) -> usize {
+    pub fn key(&self) -> NodeKey {
         match self {
             Self::Element(n) => node_key(*n),
             Self::Template(n) => node_key(*n),

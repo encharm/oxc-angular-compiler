@@ -42,7 +42,7 @@ use crate::angular::directive_matching::{CssSelector, SelectorMatcher, Selectorl
 use crate::angular::property_mapping::{AsInputOrOutput, ClassPropertyMapping, ClassPropertyName, InputOrOutput};
 use crate::angular::t2_api::{
     Binding, BindingConsumer, BoundTarget, ConflictingHostDirectiveBinding, DirectiveMeta, DirectiveOwner,
-    ForeignComponentMeta, InputOrOutputKind, LegacyAnimationTriggerNames, MatchSource, ReferenceDeferredTrigger, ReferenceTarget, ScopedNode,
+    ForeignComponentMeta, InputOrOutputKind, LegacyAnimationTriggerNames, MatchSource, NodeKey, ReferenceDeferredTrigger, ReferenceTarget, ScopedNode,
     Target, TemplateEntity, expr_key, node_key,
 };
 
@@ -148,7 +148,7 @@ type BindingsMap<'a, D> = Map<Binding<'a>, BindingConsumer<'a, D>>;
 
 // t2_binder.ts:93 ReferenceMap
 /// Shorthand for a map between a reference AST node (by `node_key`) and the entity it's targeting.
-type ReferenceMap<'a, D> = Map<usize, ReferenceTarget<'a, D>>;
+type ReferenceMap<'a, D> = Map<NodeKey, ReferenceTarget<'a, D>>;
 
 // t2_binder.ts:99 MatchedDirectives
 /// Mapping between AST nodes and the directives that have been matched on them.
@@ -348,19 +348,19 @@ impl<D: BinderDirective> R3TargetBinder<D> {
         assert!(target.template.is_some() || target.host.is_some(), "Empty bound targets are not supported");
 
         let mut directives: MatchedDirectives<'a, D> = Map::default();
-        let mut foreign_components: Map<usize, ForeignComponentMeta> = Map::default();
+        let mut foreign_components: Map<NodeKey, ForeignComponentMeta> = Map::default();
         let mut eager_directives: Vec<D> = Vec::new();
         let mut missing_directives: Set<String> = Set::default();
         let mut bindings: BindingsMap<'a, D> = Map::default();
         let mut references: ReferenceMap<'a, D> = Map::default();
         let mut scoped_node_entities: ScopedNodeEntities<'a> = Map::default();
-        let mut expressions: Map<usize, TemplateEntity<'a>> = Map::default();
+        let mut expressions: Map<NodeKey, TemplateEntity<'a>> = Map::default();
         let mut symbols: Map<TemplateEntity<'a>, ScopedNode<'a>> = Map::default();
         let mut nesting_level: Map<ScopedNode<'a>, usize> = Map::default();
         let mut used_pipes: Set<String> = Set::default();
         let mut eager_pipes: Set<String> = Set::default();
         let mut defer_blocks: DeferBlockScopes<'a> = Vec::new();
-        let mut pipes: Map<usize, Vec<&'a R3DeferredBlock<'a>>> = Map::default();
+        let mut pipes: Map<NodeKey, Vec<&'a R3DeferredBlock<'a>>> = Map::default();
         let mut conflicting_host_directive_bindings: ConflictingHostDirectiveBindings<'a, D> = Map::default();
         let mut scopes = Scopes::default();
 
@@ -1074,7 +1074,7 @@ struct DirectiveBinder<'b, 'a, D> {
     foreign_matcher: Option<&'b SelectorlessMatcher<ForeignComponentMeta>>,
     directives: &'b mut MatchedDirectives<'a, D>,
     /// By element (`node_key`)
-    foreign_components: &'b mut Map<usize, ForeignComponentMeta>,
+    foreign_components: &'b mut Map<NodeKey, ForeignComponentMeta>,
     eager_directives: &'b mut Vec<D>,
     missing_directives: &'b mut Set<String>,
     bindings: &'b mut BindingsMap<'a, D>,
@@ -1099,7 +1099,7 @@ impl<'b, 'a, D: BinderDirective> DirectiveBinder<'b, 'a, D> {
         directive_matcher: Option<&'b DirectiveMatcher<D>>,
         foreign_matcher: Option<&'b SelectorlessMatcher<ForeignComponentMeta>>,
         directives: &'b mut MatchedDirectives<'a, D>,
-        foreign_components: &'b mut Map<usize, ForeignComponentMeta>,
+        foreign_components: &'b mut Map<NodeKey, ForeignComponentMeta>,
         eager_directives: &'b mut Vec<D>,
         missing_directives: &'b mut Set<String>,
         bindings: &'b mut BindingsMap<'a, D>,
@@ -1583,7 +1583,7 @@ impl<'a, D: BinderDirective> DirectiveBinder<'_, 'a, D> {
 /// `RecursiveAstVisitor` are ported below, as `TemplateBinder` methods marked with their files.)
 struct TemplateBinder<'b, 'a> {
     /// By expression (`expr_key`)
-    bindings: &'b mut Map<usize, TemplateEntity<'a>>,
+    bindings: &'b mut Map<NodeKey, TemplateEntity<'a>>,
     symbols: &'b mut Map<TemplateEntity<'a>, ScopedNode<'a>>,
     used_pipes: &'b mut Set<String>,
     eager_pipes: &'b mut Set<String>,
@@ -1594,7 +1594,7 @@ struct TemplateBinder<'b, 'a> {
     root_node: Option<ScopedNode<'a>>,
     level: usize,
     /// By pipe (`node_key`)
-    pipes: &'b mut Map<usize, Vec<&'a R3DeferredBlock<'a>>>,
+    pipes: &'b mut Map<NodeKey, Vec<&'a R3DeferredBlock<'a>>>,
 }
 
 impl<'b, 'a> TemplateBinder<'b, 'a> {
@@ -1613,13 +1613,13 @@ impl<'b, 'a> TemplateBinder<'b, 'a> {
         node_or_nodes: NodeOrNodes<'a>,
         scopes: &'b Scopes<'a>,
         scope: ScopeId,
-        expressions: &'b mut Map<usize, TemplateEntity<'a>>,
+        expressions: &'b mut Map<NodeKey, TemplateEntity<'a>>,
         symbols: &'b mut Map<TemplateEntity<'a>, ScopedNode<'a>>,
         nesting_level: &'b mut Map<ScopedNode<'a>, usize>,
         used_pipes: &'b mut Set<String>,
         eager_pipes: &'b mut Set<String>,
         defer_blocks: &'b mut DeferBlockScopes<'a>,
-        pipes: &'b mut Map<usize, Vec<&'a R3DeferredBlock<'a>>>,
+        pipes: &'b mut Map<NodeKey, Vec<&'a R3DeferredBlock<'a>>>,
     ) {
         let template = match node_or_nodes {
             NodeOrNodes::Node(node @ ScopedNode::Template(_)) => Some(node),
@@ -2252,7 +2252,7 @@ impl<'a> TemplateBinder<'_, 'a> {
     }
 
     // t2_binder.ts:1261 maybeMap (`ast` is the read's `expr_key`, `receiver` its receiver)
-    fn maybe_map(&mut self, ast: usize, receiver: &AngularExpression<'a>, name: &str) {
+    fn maybe_map(&mut self, ast: NodeKey, receiver: &AngularExpression<'a>, name: &str) {
         // If the receiver of the expression isn't the `ImplicitReceiver`, this isn't the root of an
         // `AST` expression that maps to a `Variable` or `Reference`.
         if !matches!(receiver, AngularExpression::ImplicitReceiver(_)) {
@@ -2275,25 +2275,25 @@ pub struct R3BoundTarget<'a, D> {
     target: Target<'a, D>,
     directives: MatchedDirectives<'a, D>,
     /// By element (`node_key`)
-    foreign_components: Map<usize, ForeignComponentMeta>,
+    foreign_components: Map<NodeKey, ForeignComponentMeta>,
     eager_directives: Vec<D>,
     missing_directives: Set<String>,
     bindings: BindingsMap<'a, D>,
     references: ReferenceMap<'a, D>,
     /// By expression (`expr_key`)
-    expr_targets: Map<usize, TemplateEntity<'a>>,
+    expr_targets: Map<NodeKey, TemplateEntity<'a>>,
     symbols: Map<TemplateEntity<'a>, ScopedNode<'a>>,
     nesting_level: Map<ScopedNode<'a>, usize>,
     scoped_node_entities: ScopedNodeEntities<'a>,
     used_pipes: Set<String>,
     eager_pipes: Set<String>,
     /// By pipe (`node_key`)
-    pipes: Map<usize, Vec<&'a R3DeferredBlock<'a>>>,
+    pipes: Map<NodeKey, Vec<&'a R3DeferredBlock<'a>>>,
     conflicting_host_directive_bindings: ConflictingHostDirectiveBindings<'a, D>,
     /// Deferred blocks, ordered as they appear in the template.
     deferred_blocks: Vec<&'a R3DeferredBlock<'a>>,
     /// Map of deferred blocks (by `node_key`) to their scope.
-    deferred_scopes: Map<usize, ScopeId>,
+    deferred_scopes: Map<NodeKey, ScopeId>,
     /// The scopes that `deferred_scopes` refer to.
     scopes: Scopes<'a>,
 }
@@ -2303,19 +2303,19 @@ impl<'a, D: BinderDirective> R3BoundTarget<'a, D> {
     fn new(
         target: Target<'a, D>,
         directives: MatchedDirectives<'a, D>,
-        foreign_components: Map<usize, ForeignComponentMeta>,
+        foreign_components: Map<NodeKey, ForeignComponentMeta>,
         eager_directives: Vec<D>,
         missing_directives: Set<String>,
         bindings: BindingsMap<'a, D>,
         references: ReferenceMap<'a, D>,
-        expr_targets: Map<usize, TemplateEntity<'a>>,
+        expr_targets: Map<NodeKey, TemplateEntity<'a>>,
         symbols: Map<TemplateEntity<'a>, ScopedNode<'a>>,
         nesting_level: Map<ScopedNode<'a>, usize>,
         scoped_node_entities: ScopedNodeEntities<'a>,
         used_pipes: Set<String>,
         eager_pipes: Set<String>,
         raw_deferred: &DeferBlockScopes<'a>,
-        pipes: Map<usize, Vec<&'a R3DeferredBlock<'a>>>,
+        pipes: Map<NodeKey, Vec<&'a R3DeferredBlock<'a>>>,
         conflicting_host_directive_bindings: ConflictingHostDirectiveBindings<'a, D>,
         scopes: Scopes<'a>,
     ) -> Self {
