@@ -2,11 +2,15 @@
 //! block generator; and the command line.
 
 pub mod cli;
+pub mod compiler_options;
 pub mod compiler_utils;
 pub mod dependency_templates;
+pub mod diagnostic;
 pub mod dom_schema_checker;
+pub mod file_analysis;
 pub mod oob;
 pub mod processor;
+pub mod selectorless;
 pub mod tcb;
 pub mod tcb_adapter;
 pub mod tcb_util;

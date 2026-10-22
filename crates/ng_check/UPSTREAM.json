@@ -3,7 +3,7 @@
     "repository": "https://github.com/angular/angular",
     "commit": "3cc1edf3210a9debb0be57a4e99e53a54505db32"
   },
-  "note": "processor.ts and compiler-utils.ts are ported in part: what generates type-check blocks (see the comments in the Rust files).",
+  "note": "processor.ts, compiler-utils.ts and diagnostic.ts are ported in part: what generates type-check blocks (see the comments in the Rust files).",
   "files": [
     {
       "upstream": "packages/compiler/src/core.ts",
@@ -192,6 +192,22 @@
     {
       "upstream": "packages/compiler-cli/preprocessor/src/template_semantics.ts",
       "rust": "crates/ng_check/src/ngp/template_semantics.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/compiler_options.ts",
+      "rust": "crates/ng_check/src/ngp/compiler_options.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/diagnostic.ts",
+      "rust": "crates/ng_check/src/ngp/diagnostic.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/file_analysis.ts",
+      "rust": "crates/ng_check/src/ngp/file_analysis.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/selectorless.ts",
+      "rust": "crates/ng_check/src/ngp/selectorless.rs"
     },
     {
       "upstream": "packages/compiler-cli/preprocessor/src/processor.ts",
