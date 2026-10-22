@@ -3647,7 +3647,14 @@ impl<'a> HtmlToR3Transform<'a> {
         key_span: Span,
     ) -> R3BoundAttribute<'a> {
         let value_span = attr.value_span.unwrap_or(attr.span);
-        let value = self.parse_binding_expression(&attr.value, value_span);
+        let value = if binding_type == BindingType::LegacyAnimation && attr.value.is_empty() {
+            // A legacy animation binding without a value (`[@trigger]`) binds `undefined`,
+            // parsed where the value (or else the attribute) starts.
+            // Reference: binding_parser.ts lines 505-510 (`_parseLegacyAnimation`)
+            self.binding_parser.parse_binding("undefined", value_span).ast
+        } else {
+            self.parse_binding_expression(&attr.value, value_span)
+        };
         let name_atom = Ident::from(self.allocator.alloc_str(property_name));
 
         // Look up security context based on element and property
@@ -5987,5 +5994,145 @@ mod key_span_tests {
             key_spans(r#"<div *ngIf="let a=b"></div>"#),
             pairs(&[("TextAttribute", "ngIf"), ("Variable", "a")])
         );
+    }
+}
+
+/// Source spans of the R3 nodes the type checker writes into its output, ported from Angular's
+/// `test/render3/r3_ast_spans_spec.ts`.
+#[cfg(test)]
+mod span_tests {
+    use super::*;
+    use crate::ast::expression::AngularExpression;
+    use crate::parser::html::HtmlParser;
+    use oxc_allocator::Allocator;
+
+    fn text(source: &str, start: u32, end: u32) -> &str {
+        &source[start as usize..end as usize]
+    }
+
+    /// The source spans of a `*` template's microsyntax bindings and variables.
+    fn template_binding_spans(source: &str) -> std::vec::Vec<(&'static str, &str)> {
+        let allocator = Allocator::default();
+        let parsed = HtmlParser::new(&allocator, source, "test.html").parse();
+        let result =
+            html_ast_to_r3_ast(&allocator, source, &parsed.nodes, TransformOptions::default());
+        let Some(R3Node::Template(tpl)) = result.nodes.first() else {
+            panic!("expected a template");
+        };
+        let mut out = std::vec::Vec::new();
+        for attr in &tpl.template_attrs {
+            match attr {
+                R3TemplateAttr::Text(attr) => out.push((
+                    "TextAttribute",
+                    text(source, attr.source_span.start, attr.source_span.end),
+                )),
+                R3TemplateAttr::Bound(input) => out.push((
+                    "BoundAttribute",
+                    text(source, input.source_span.start, input.source_span.end),
+                )),
+            }
+        }
+        for variable in &tpl.variables {
+            out.push((
+                "Variable",
+                text(source, variable.source_span.start, variable.source_span.end),
+            ));
+        }
+        out
+    }
+
+    #[test]
+    fn template_binding_source_spans_run_to_the_next_binding() {
+        assert_eq!(
+            template_binding_spans(r#"<div *ngFor="let item of items"></div>"#),
+            [("TextAttribute", "ngFor"), ("BoundAttribute", "of items"), ("Variable", "let item ")]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngFor="item of items"></div>"#),
+            [("BoundAttribute", r#"ngFor="item "#), ("BoundAttribute", "of items")]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngFor="let item of items; trackBy: trackByFn"></div>"#),
+            [
+                ("TextAttribute", "ngFor"),
+                ("BoundAttribute", "of items; "),
+                ("BoundAttribute", "trackBy: trackByFn"),
+                ("Variable", "let item "),
+            ]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngIf="let a=b"></div>"#),
+            [("TextAttribute", "ngIf"), ("Variable", "let a=b")]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngIf="expr as local"></div>"#),
+            [("BoundAttribute", r#"ngIf="expr "#), ("Variable", r#"ngIf="expr as local"#)]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngTemplateOutlet="tpl; context: ctx"></div>"#),
+            [("BoundAttribute", r#"ngTemplateOutlet="tpl; "#), ("BoundAttribute", "context: ctx"),]
+        );
+        assert_eq!(
+            template_binding_spans(r#"<div *ngFor="let row; let i = index"></div>"#),
+            [("TextAttribute", "ngFor"), ("Variable", "let row; "), ("Variable", "let i = index")]
+        );
+    }
+
+    fn parse_first<'a>(allocator: &'a Allocator, source: &'a str) -> R3Node<'a> {
+        let parsed = HtmlParser::new(allocator, source, "test.html").parse();
+        let mut result =
+            html_ast_to_r3_ast(allocator, source, &parsed.nodes, TransformOptions::default());
+        result.nodes.remove(0)
+    }
+
+    #[test]
+    fn if_alias_starts_after_as() {
+        // Reference: r3_control_flow.ts lines 676-677
+        for (source, name) in [("@if (stats(); as s) {}", "s"), ("@if (m.a; as   a) {}", "a")] {
+            let allocator = Allocator::default();
+            let R3Node::IfBlock(block) = parse_first(&allocator, source) else {
+                panic!("expected an @if block");
+            };
+            let alias = block.branches[0].expression_alias.as_ref().expect("an alias");
+            assert_eq!(text(source, alias.key_span.start, alias.key_span.end), name);
+            assert_eq!(text(source, alias.source_span.start, alias.source_span.end), name);
+            let after = &source[alias.key_span.start as usize - 1..];
+            assert!(after.starts_with(' '), "{source}: the alias starts after `as `");
+        }
+    }
+
+    #[test]
+    fn assignment_starts_at_its_target() {
+        let source = r#"<button (click)="open = !open"></button>"#;
+        let allocator = Allocator::default();
+        let R3Node::Element(el) = parse_first(&allocator, source) else {
+            panic!("expected an element");
+        };
+        let handler = match &el.outputs[0].handler {
+            AngularExpression::Chain(chain) => &chain.expressions[0],
+            handler => handler,
+        };
+        let AngularExpression::Binary(binary) = handler else {
+            panic!("expected an assignment, got {handler:?}");
+        };
+        assert_eq!(text(source, binary.source_span.start, binary.source_span.end), "open = !open");
+    }
+
+    #[test]
+    fn valueless_legacy_animation_binds_undefined() {
+        // `_parseLegacyAnimation` parses `undefined` at the start of the attribute.
+        // Reference: binding_parser.ts lines 505-510
+        let source = r#"<div [@trigger]></div>"#;
+        let allocator = Allocator::default();
+        let R3Node::Element(el) = parse_first(&allocator, source) else {
+            panic!("expected an element");
+        };
+        let value = &el.inputs[0].value;
+        assert!(
+            matches!(value, AngularExpression::LiteralPrimitive(_)),
+            "expected `undefined`, got {value:?}"
+        );
+        let span = value.source_span();
+        assert_eq!(text(source, span.start, span.end), "[@trigger");
     }
 }
