@@ -215,6 +215,12 @@ impl CssSelector {
     /// As the TypeScript throws: on a nested `:not`, a selector list inside `:not`, or an unescaped `$` in an
     /// attribute name.
     pub fn parse(selector: &str) -> Vec<CssSelector> {
+        Self::try_parse(selector).unwrap_or_else(|message| panic!("{message}"))
+    }
+
+    /// `parse`, with what the TypeScript throws as an error (for its callers that catch it: the release build
+    /// aborts on a panic)
+    pub fn try_parse(selector: &str) -> Result<Vec<CssSelector>, String> {
         let mut results: Vec<CssSelector> = Vec::new();
         let add_result = |res: &mut Vec<CssSelector>, mut css_sel: CssSelector| {
             if !css_sel.not_selectors.is_empty()
@@ -234,7 +240,9 @@ impl CssSelector {
         while let Some(match_) = selector_regexp_exec(selector, last_index) {
             last_index = match_.last_index;
             if match_.get(SelectorRegexp::Not).is_some_and(|s| !s.is_empty()) {
-                assert!(!in_not, "Nesting :not in a selector is not allowed");
+                if in_not {
+                    return Err("Nesting :not in a selector is not allowed".to_string());
+                }
                 in_not = true;
                 css_selector.not_selectors.push(CssSelector::new());
                 current_is_not = true;
@@ -260,7 +268,7 @@ impl CssSelector {
             let attribute = match_.get(SelectorRegexp::Attribute);
 
             if let Some(attribute) = attribute.filter(|s| !s.is_empty()) {
-                let name = current.unescape_attribute(attribute);
+                let name = current.try_unescape_attribute(attribute)?;
                 current
                     .add_attribute(&name, match_.get(SelectorRegexp::AttributeValue).unwrap_or(""));
             }
@@ -269,13 +277,15 @@ impl CssSelector {
                 current_is_not = false;
             }
             if match_.get(SelectorRegexp::Separator).is_some_and(|s| !s.is_empty()) {
-                assert!(!in_not, "Multiple selectors in :not are not supported");
+                if in_not {
+                    return Err("Multiple selectors in :not are not supported".to_string());
+                }
                 add_result(&mut results, std::mem::take(&mut css_selector));
                 current_is_not = false;
             }
         }
         add_result(&mut results, css_selector);
-        results
+        Ok(results)
     }
 
     // directive_matching.ts:133 unescapeAttribute
@@ -292,6 +302,11 @@ impl CssSelector {
     ///
     /// On an unescaped `$`, as the TypeScript throws.
     pub fn unescape_attribute(&self, attr: &str) -> String {
+        self.try_unescape_attribute(attr).unwrap_or_else(|message| panic!("{message}"))
+    }
+
+    /// `unescapeAttribute`, with what the TypeScript throws as an error
+    pub fn try_unescape_attribute(&self, attr: &str) -> Result<String, String> {
         let mut result = String::new();
         let mut escaping = false;
         for char in attr.chars() {
@@ -299,14 +314,15 @@ impl CssSelector {
                 escaping = true;
                 continue;
             }
-            assert!(
-                char != '$' || escaping,
-                "Error in attribute selector \"{attr}\". Unescaped \"$\" is not supported. Please escape with \"\\$\"."
-            );
+            if char == '$' && !escaping {
+                return Err(format!(
+                    "Error in attribute selector \"{attr}\". Unescaped \"$\" is not supported. Please escape with \"\\$\"."
+                ));
+            }
             escaping = false;
             result.push(char);
         }
-        result
+        Ok(result)
     }
 
     // directive_matching.ts:164 escapeAttribute

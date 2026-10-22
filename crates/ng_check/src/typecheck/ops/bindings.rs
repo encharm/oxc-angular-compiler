@@ -832,7 +832,7 @@ pub(crate) mod test_support {
         fn get_deferred_trigger_target(
             &self,
             _block: &'a R3DeferredBlock<'a>,
-            _trigger: &'a R3DeferredTrigger<'a>,
+            _trigger: crate::angular::t2_api::ReferenceDeferredTrigger<'a>,
         ) -> Option<&'a R3Element<'a>> {
             None
         }

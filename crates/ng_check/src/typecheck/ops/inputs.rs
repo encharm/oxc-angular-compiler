@@ -1,5 +1,6 @@
 //! `packages/compiler/src/typecheck/ops/inputs.ts`
 
+use crate::angular::schema::element_schema_registry::ElementSchemaRegistry;
 use oxc_angular_compiler::ast::expression::BindingType;
 use oxc_angular_compiler::ast::r3::R3BoundAttribute;
 
