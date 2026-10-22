@@ -70,22 +70,26 @@ struct Args {
     tsconfig: PathBuf,
     tsrs: Option<PathBuf>,
     keep: bool,
+    /// Where the type-check files go, instead of beside the sources. Their package imports resolve from there, so it
+    /// must reach the project's `node_modules` (a directory beside or inside the project).
+    out: Option<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
-    let (mut tsconfig, mut tsrs, mut keep) = (None, None, false);
+    let (mut tsconfig, mut tsrs, mut keep, mut out) = (None, None, false, None);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-p" | "--project" => tsconfig = args.next().map(PathBuf::from),
             "--tsrs" => tsrs = args.next().map(PathBuf::from),
             "--keep" => keep = true,
+            "--out" => out = args.next().map(PathBuf::from),
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument: {other}")),
         }
     }
     let tsconfig = tsconfig.ok_or("missing -p <tsconfig.json>")?;
-    Ok(Args { tsconfig, tsrs, keep })
+    Ok(Args { tsconfig, tsrs, keep, out })
 }
 
 pub fn main() -> i32 {
@@ -95,7 +99,7 @@ pub fn main() -> i32 {
             if !message.is_empty() {
                 eprintln!("ngcheck: {message}");
             }
-            eprintln!("usage: ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep]");
+            eprintln!("usage: ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep] [--out <dir>]");
             return 2;
         }
     };
@@ -115,7 +119,10 @@ fn run(args: &Args) -> Result<usize, String> {
     // The type-check files, beside the sources
     let root = common_root(generated.iter().map(|(path, _)| path.as_path()))
         .unwrap_or_else(|| tsconfig.parent().unwrap().to_path_buf());
-    let out = sibling_out_dir(&root);
+    let out = match &args.out {
+        Some(out) => std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?,
+        None => sibling_out_dir(&root),
+    };
     let _ = std::fs::remove_dir_all(&out);
     let mut sources_by_tcb: Vec<(PathBuf, PathBuf, GeneratedFile)> = vec![];
     let mut diagnostics: Vec<Diagnostic> = vec![];
