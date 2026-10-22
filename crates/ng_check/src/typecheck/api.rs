@@ -117,6 +117,24 @@ pub struct TcbDirectiveMetadata {
 /// The directive type of the generator's bound targets: shared, compared by identity (`Rc::ptr_eq`).
 pub type DirectiveRef = Rc<TcbDirectiveMetadata>;
 
+/// A directive as a map key: equal and hashed by identity, as a JavaScript `Map` keys an object.
+#[derive(Debug, Clone)]
+pub struct DirectiveKey(pub DirectiveRef);
+
+impl PartialEq for DirectiveKey {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for DirectiveKey {}
+
+impl std::hash::Hash for DirectiveKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::hash(Rc::as_ptr(&self.0), state);
+    }
+}
+
 impl DirectiveMeta for TcbDirectiveMetadata {
     type Input = TcbInputMapping;
 

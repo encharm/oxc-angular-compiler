@@ -17,6 +17,9 @@ path = "src/main.rs"
 oxc_angular_compiler = { workspace = true }
 oxc_allocator = { workspace = true }
 oxc_span = { workspace = true }
+oxc_str = { workspace = true }
+# `ToJsString`: JavaScript's `Number.prototype.toString`
+oxc_syntax = { workspace = true, features = ["to_js_string"] }
 oxc_parser = { workspace = true }
 oxc_ast = { workspace = true }
 oxc_ast_visit = { workspace = true }

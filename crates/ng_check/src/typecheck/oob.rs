@@ -4,9 +4,8 @@
 use oxc_angular_compiler::ast::expression::{AngularExpression, BindingPipe, PropertyRead};
 use oxc_angular_compiler::ast::r3::{
     R3BoundAttribute, R3BoundEvent, R3Component, R3Directive, R3Element, R3ForLoopBlock,
-    R3ForLoopBlockEmpty, R3HoverDeferredTrigger, R3IfBlockBranch, R3InteractionDeferredTrigger,
+    R3ForLoopBlockEmpty, R3IfBlockBranch,
     R3LetDeclaration, R3Reference, R3SwitchBlockCase, R3Template, R3TextAttribute, R3Variable,
-    R3ViewportDeferredTrigger,
 };
 
 use crate::typecheck::api::{TcbDirectiveMetadata, TypeCheckId};
@@ -51,13 +50,9 @@ pub enum ControlFlowNode<'a> {
     ForLoopBlockEmpty(&'a R3ForLoopBlockEmpty<'a>),
 }
 
-/// `HoverDeferredTrigger | InteractionDeferredTrigger | ViewportDeferredTrigger`
-#[derive(Debug, Clone, Copy)]
-pub enum ReferenceDeferredTrigger<'a> {
-    Hover(&'a R3HoverDeferredTrigger<'a>),
-    Interaction(&'a R3InteractionDeferredTrigger<'a>),
-    Viewport(&'a R3ViewportDeferredTrigger<'a>),
-}
+/// `HoverDeferredTrigger | InteractionDeferredTrigger | ViewportDeferredTrigger` (in `t2_api`, whose
+/// `get_deferred_trigger_target` takes one)
+pub use crate::angular::t2_api::ReferenceDeferredTrigger;
 
 /// `BoundAttribute | TextAttribute | BoundEvent`
 #[derive(Debug, Clone, Copy)]
