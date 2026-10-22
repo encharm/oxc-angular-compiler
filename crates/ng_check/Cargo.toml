@@ -24,6 +24,7 @@ indexmap = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+futures = { version = "0.3", features = ["executor", "std"] }
 # Angular's analyzer (crates/ng_check/PORTING.md), vendored unmodified
 ng-analyze = { path = "../../vendor/ng-analyze" }
 

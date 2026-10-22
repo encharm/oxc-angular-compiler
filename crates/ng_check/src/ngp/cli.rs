@@ -188,8 +188,62 @@ fn run(args: &Args) -> Result<usize, String> {
 }
 
 /// Analyzes the project with ng-analyze and generates each file's type-check block (`processor`)
-fn generate_project(_tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, String> {
-    Err("type-check block generation is not wired up yet".into())
+fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, String> {
+    let (analyzer, files) = analyze(tsconfig)?;
+    let mut generated = vec![];
+    for result in &files {
+        let path = PathBuf::from(&result.file_path);
+        // the analysis' own diagnostics (unsupported decorators, unresolvable metadata, ...)
+        let mut file = generate_file(&analyzer, result)?;
+        for d in &result.diagnostics {
+            let file_path = d.file_path.as_ref().map_or_else(|| path.clone(), PathBuf::from);
+            let start = d.span.as_ref().map_or(0, |span| utf16_of_byte(&file_path, span.start));
+            file.diagnostics.push(Diagnostic {
+                file: Some(file_path),
+                start,
+                code: format!("NG{}", d.code),
+                category: if d.category == 1 { Category::Error } else { Category::Warning },
+                message: d.message_text.clone(),
+            });
+        }
+        generated.push((path, file));
+    }
+    Ok(generated)
+}
+
+/// ng-analyze's analysis of the project: every file it compiles, with its metadata
+fn analyze(tsconfig: &Path) -> Result<(ng_analyze::Analyzer, Vec<ng_analyze::AnalysisResult>), String> {
+    use futures::StreamExt;
+    let options = ng_analyze::AnalyzerOptions {
+        tsconfig_path: tsconfig.to_string_lossy().into_owned(),
+        optimize: Some(true),
+        ..Default::default()
+    };
+    let analyzer = ng_analyze::Analyzer::new_core(options)?;
+    let mut chunks =
+        analyzer.analyze_optimized_core(ng_analyze::compiler::analyzer::get_global_pool().clone())?;
+    let mut files = vec![];
+    while let Some(chunk) = futures::executor::block_on(chunks.next()) {
+        files.extend(chunk?.files);
+    }
+    Ok((analyzer, files))
+}
+
+/// One file's type-check block and the diagnostics found making it (`processor`)
+fn generate_file(
+    _analyzer: &ng_analyze::Analyzer,
+    _result: &ng_analyze::AnalysisResult,
+) -> Result<GeneratedFile, String> {
+    // wired to `crate::ngp::processor` once that port lands
+    Ok(GeneratedFile::default())
+}
+
+/// The UTF-16 index of a byte offset in a file
+fn utf16_of_byte(file: &Path, byte: u32) -> u32 {
+    let Ok(text) = std::fs::read_to_string(file) else { return byte };
+    let byte = (byte as usize).min(text.len());
+    let byte = (0..=byte).rev().find(|b| text.is_char_boundary(*b)).unwrap_or(0);
+    text[..byte].encode_utf16().count() as u32
 }
 
 /// tsrs from `@codecharm/tsrs` (its install links it to `bin/tsrs`) in the nearest `node_modules`, else `tsrs` on the

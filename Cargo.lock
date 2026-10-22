@@ -935,6 +935,7 @@ dependencies = [
 name = "ng_check"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "indexmap",
  "ng-analyze",
  "oxc_allocator 0.155.0",
