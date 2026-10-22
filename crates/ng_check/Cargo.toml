@@ -1,0 +1,31 @@
+[package]
+name = "ng_check"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Angular template type checking without Node: Angular's type-check block generator, ported, over ng-analyze and tsrs"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "ngcheck"
+path = "src/main.rs"
+
+[dependencies]
+oxc_angular_compiler = { workspace = true }
+oxc_allocator = { workspace = true }
+oxc_span = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_ast_visit = { workspace = true }
+indexmap = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+# Angular's analyzer (crates/ng_check/PORTING.md), vendored unmodified
+ng-analyze = { path = "../../vendor/ng-analyze" }
+
+[lints]
+workspace = true

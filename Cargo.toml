@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "napi/angular-compiler"]
+members = ["crates/*", "napi/angular-compiler", "vendor/ng-analyze"]
 
 [workspace.package]
 authors = ["LongYinan <brooklyn@voidzero.dev>"]

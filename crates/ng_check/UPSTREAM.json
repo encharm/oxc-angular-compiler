@@ -1,0 +1,226 @@
+{
+  "angular": {
+    "repository": "https://github.com/angular/angular",
+    "commit": "3cc1edf3210a9debb0be57a4e99e53a54505db32"
+  },
+  "note": "processor.ts and compiler-utils.ts are ported in part: what generates type-check blocks (see the comments in the Rust files).",
+  "files": [
+    {
+      "upstream": "packages/compiler/src/core.ts",
+      "rust": "crates/ng_check/src/angular/core.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/property_mapping.ts",
+      "rust": "crates/ng_check/src/angular/property_mapping.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/directive_matching.ts",
+      "rust": "crates/ng_check/src/angular/directive_matching.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/render3/view/t2_api.ts",
+      "rust": "crates/ng_check/src/angular/t2_api.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/render3/view/t2_binder.ts",
+      "rust": "crates/ng_check/src/angular/t2_binder.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/schema/element_schema_registry.ts",
+      "rust": "crates/ng_check/src/angular/schema/element_schema_registry.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/schema/dom_element_schema_registry.ts",
+      "rust": "crates/ng_check/src/angular/schema/dom_element_schema_registry.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/api.ts",
+      "rust": "crates/ng_check/src/typecheck/api.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/comments.ts",
+      "rust": "crates/ng_check/src/typecheck/comments.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/expression.ts",
+      "rust": "crates/ng_check/src/typecheck/expression.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/host_bindings.ts",
+      "rust": "crates/ng_check/src/typecheck/host_bindings.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/oob.ts",
+      "rust": "crates/ng_check/src/typecheck/oob.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/schema.ts",
+      "rust": "crates/ng_check/src/typecheck/schema.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/type_check_block.ts",
+      "rust": "crates/ng_check/src/typecheck/type_check_block.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/base.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/base.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/bindings.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/bindings.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/boundary.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/boundary.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/codegen.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/codegen.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/completions.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/completions.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/content_projection.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/content_projection.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/context.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/context.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/directive_constructor.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/directive_constructor.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/directive_type.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/directive_type.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/element.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/element.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/events.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/events.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/expression.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/expression.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/for_block.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/for_block.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/host.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/host.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/if_block.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/if_block.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/inputs.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/inputs.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/intersection_observer.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/intersection_observer.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/let.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/let.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/references.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/references.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/schema.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/schema.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/scope.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/scope.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/selectorless.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/selectorless.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/signal_forms.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/signal_forms.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/switch_block.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/switch_block.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/template.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/template.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/typecheck/ops/variables.ts",
+      "rust": "crates/ng_check/src/typecheck/ops/variables.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/tcb.ts",
+      "rust": "crates/ng_check/src/ngp/tcb.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/tcb_adapter.ts",
+      "rust": "crates/ng_check/src/ngp/tcb_adapter.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/tcb_util.ts",
+      "rust": "crates/ng_check/src/ngp/tcb_util.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/dependency_templates.ts",
+      "rust": "crates/ng_check/src/ngp/dependency_templates.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/dom_schema_checker.ts",
+      "rust": "crates/ng_check/src/ngp/dom_schema_checker.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/oob.ts",
+      "rust": "crates/ng_check/src/ngp/oob.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/template_semantics.ts",
+      "rust": "crates/ng_check/src/ngp/template_semantics.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/processor.ts",
+      "rust": "crates/ng_check/src/ngp/processor.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/preprocessor/src/compiler-utils.ts",
+      "rust": "crates/ng_check/src/ngp/compiler_utils.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/typecheck/src/diagnostics.ts",
+      "rust": "crates/ng_check/src/ngtsc/diagnostics.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/typecheck/src/tcb_util.ts",
+      "rust": "crates/ng_check/src/ngtsc/tcb_util.rs"
+    },
+    {
+      "upstream": "packages/compiler-cli/src/ngtsc/typecheck/src/comments.ts",
+      "rust": "crates/ng_check/src/ngtsc/comments.rs"
+    }
+  ],
+  "vendored": [
+    {
+      "upstream": "packages/compiler-cli/preprocessor/ng-analyze",
+      "path": "vendor/ng-analyze",
+      "omit": [
+        "BUILD.bazel"
+      ]
+    }
+  ]
+}
