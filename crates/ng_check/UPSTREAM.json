@@ -3,7 +3,7 @@
     "repository": "https://github.com/angular/angular",
     "commit": "3cc1edf3210a9debb0be57a4e99e53a54505db32"
   },
-  "note": "processor.ts and compiler-utils.ts are ported in part: what generates type-check blocks (see the comments in the Rust files).",
+  "note": "processor.ts and compiler-utils.ts are ported in part: what generates type-check blocks (see the comments in the Rust files). t2_binder.rs also holds what the binder uses of render3/view/util.ts (createCssSelectorFromNode), combined_visitor.ts, ml_parser/tags.ts (splitNsName, isNgTemplate), and the Visitor interface of render3/r3_ast.ts and RecursiveAstVisitor of expression_parser/ast.ts.",
   "files": [
     {
       "upstream": "packages/compiler/src/core.ts",
@@ -23,6 +23,18 @@
     },
     {
       "upstream": "packages/compiler/src/render3/view/t2_binder.ts",
+      "rust": "crates/ng_check/src/angular/t2_binder.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/render3/view/util.ts",
+      "rust": "crates/ng_check/src/angular/t2_binder.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/combined_visitor.ts",
+      "rust": "crates/ng_check/src/angular/t2_binder.rs"
+    },
+    {
+      "upstream": "packages/compiler/src/ml_parser/tags.ts",
       "rust": "crates/ng_check/src/angular/t2_binder.rs"
     },
     {
