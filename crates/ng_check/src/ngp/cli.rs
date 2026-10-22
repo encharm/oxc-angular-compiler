@@ -197,7 +197,8 @@ fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, St
         let mut file = generate_file(&analyzer, result)?;
         for d in &result.diagnostics {
             let file_path = d.file_path.as_ref().map_or_else(|| path.clone(), PathBuf::from);
-            let start = d.span.as_ref().map_or(0, |span| utf16_of_byte(&file_path, span.start));
+            // ng-analyze's spans are JavaScript string (UTF-16) indices already
+            let start = d.span.as_ref().map_or(0, |span| span.start);
             file.diagnostics.push(Diagnostic {
                 file: Some(file_path),
                 start,
@@ -236,14 +237,6 @@ fn generate_file(
 ) -> Result<GeneratedFile, String> {
     // wired to `crate::ngp::processor` once that port lands
     Ok(GeneratedFile::default())
-}
-
-/// The UTF-16 index of a byte offset in a file
-fn utf16_of_byte(file: &Path, byte: u32) -> u32 {
-    let Ok(text) = std::fs::read_to_string(file) else { return byte };
-    let byte = (byte as usize).min(text.len());
-    let byte = (0..=byte).rev().find(|b| text.is_char_boundary(*b)).unwrap_or(0);
-    text[..byte].encode_utf16().count() as u32
 }
 
 /// tsrs from `@codecharm/tsrs` (its install links it to `bin/tsrs`) in the nearest `node_modules`, else `tsrs` on the
