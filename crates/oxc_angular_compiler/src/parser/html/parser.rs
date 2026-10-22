@@ -65,17 +65,17 @@ pub struct HtmlParser<'a> {
 impl<'a> HtmlParser<'a> {
     /// Creates a new parser.
     pub fn new(allocator: &'a Allocator, source: &'a str, url: &str) -> Self {
-        Self::new_internal(allocator, source, url, false, false, None, true, true, None)
+        Self::new_internal(allocator, source, url, false, false, None, true, true, None, false, None)
     }
 
     /// Creates a new parser with selectorless mode enabled.
     pub fn with_selectorless(allocator: &'a Allocator, source: &'a str, url: &str) -> Self {
-        Self::new_internal(allocator, source, url, true, false, None, true, true, None)
+        Self::new_internal(allocator, source, url, true, false, None, true, true, None, false, None)
     }
 
     /// Creates a new parser with expansion forms (ICU messages) enabled.
     pub fn with_expansion_forms(allocator: &'a Allocator, source: &'a str, url: &str) -> Self {
-        Self::new_internal(allocator, source, url, false, true, None, true, true, None)
+        Self::new_internal(allocator, source, url, false, true, None, true, true, None, false, None)
     }
 
     /// Creates a new parser with expansion forms and leading trivia chars enabled.
@@ -94,6 +94,8 @@ impl<'a> HtmlParser<'a> {
             Some(leading_trivia_chars),
             true,
             true,
+            None,
+            false,
             None,
         )
     }
@@ -118,6 +120,8 @@ impl<'a> HtmlParser<'a> {
             options.enable_block_syntax,
             options.enable_let_syntax,
             options.interpolation.as_ref().map(|(s, e)| (s.as_str(), e.as_str())),
+            options.escaped_string,
+            options.range,
         )
     }
 
@@ -132,12 +136,18 @@ impl<'a> HtmlParser<'a> {
         tokenize_blocks: bool,
         tokenize_let: bool,
         interpolation: Option<(&str, &str)>,
+        escaped_string: bool,
+        range: Option<super::super::LexerRange>,
     ) -> Self {
         let mut lexer = HtmlLexer::new(source)
             .with_selectorless(selectorless)
             .with_expansion_forms(expansion_forms)
             .with_blocks(tokenize_blocks)
-            .with_let(tokenize_let);
+            .with_let(tokenize_let)
+            .with_escaped_string(escaped_string);
+        if let Some(range) = range {
+            lexer = lexer.with_range(range.start_pos, range.end_pos, range.start_line, range.start_col);
+        }
 
         if let Some(chars) = leading_trivia_chars {
             lexer = lexer.with_leading_trivia_chars(chars);

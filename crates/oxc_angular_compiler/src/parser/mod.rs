@@ -48,4 +48,18 @@ pub struct ParseTemplateOptions {
     /// Custom interpolation delimiters.
     /// Default is ("{{", "}}").
     pub interpolation: Option<(String, String)>,
+    /// The source is a string literal's raw text: process its escape sequences (Angular's `escapedString`, for
+    /// inline templates parsed in place in their file).
+    pub escaped_string: bool,
+    /// Parse only this range of the source, with positions in the whole source (Angular's `range`).
+    pub range: Option<LexerRange>,
+}
+
+/// A range of a template's source (Angular's `LexerRange`)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LexerRange {
+    pub start_pos: u32,
+    pub end_pos: u32,
+    pub start_line: u32,
+    pub start_col: u32,
 }
