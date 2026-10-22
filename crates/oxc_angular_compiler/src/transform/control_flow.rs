@@ -257,8 +257,11 @@ pub fn parse_conditional_params<'a>(
 
             if is_valid_js_identifier(name_str) {
                 // Create the alias variable
-                // Calculate span for just the variable name (not including "as ")
-                let as_prefix_len = param_str.find(name_str).unwrap_or(0) as u32;
+                // The span of just the variable name: it starts after `as` and the whitespace
+                // that follows (`aliasMatch[1]`), not at the name's first occurrence, which can
+                // be inside `as` (`as s`, `as a`).
+                // Reference: r3_control_flow.ts lines 676-677
+                let as_prefix_len = (param_str.len() - alias_value.len()) as u32;
                 let name_span = Span::new(
                     param.span.start + as_prefix_len,
                     param.span.start + as_prefix_len + name_str.len() as u32,

@@ -493,8 +493,6 @@ impl<'a> Parser<'a> {
             let value = self.parse_pipe_for_template_binding();
             // Value source is just the expression (up to current_end_index)
             let value_end = self.current_end_index();
-            // Source span extends to start of next token (includes trailing whitespace)
-            let source_end = self.peek().map(|t| t.index).unwrap_or(self.source.len() as u32);
 
             let value_source = &self.source[start as usize..value_end as usize];
 
@@ -503,8 +501,14 @@ impl<'a> Parser<'a> {
                 template_key.span.start,
                 template_key.span.end,
             );
+            // Without an `as` binding, the span takes in the statement terminator and the
+            // whitespace up to the next binding.
+            // Reference: parser.ts lines 1551-1562 (`parseDirectiveKeywordBindings`)
+            if !self.peek().is_some_and(|t| t.is_keyword_value("as")) {
+                self.consume_statement_terminator();
+            }
             let source_span =
-                AbsoluteSourceSpan::new(template_key.span.start, self.absolute_offset + source_end);
+                AbsoluteSourceSpan::new(template_key.span.start, self.current_absolute_offset());
 
             // Angular expects None for empty values (e.g., `*a=""`)
             let expr_value = if value_source.is_empty() {
@@ -632,7 +636,7 @@ impl<'a> Parser<'a> {
         let key = self.make_template_binding_identifier(key_source.as_str(), key_start, key_end);
 
         // Check for `=` (e.g., `let i = index`)
-        let (value, source_end) = if self.optional_operator("=") {
+        let value = if self.optional_operator("=") {
             let value_token = self.peek()?.clone();
             if !value_token.is_identifier() && !value_token.is_keyword() {
                 self.error("Expected identifier after '='");
@@ -644,19 +648,16 @@ impl<'a> Parser<'a> {
             // Use the value as-is (e.g., `let i = index` -> value is "index")
             let value_source = value_token.str_value.as_str();
             self.advance();
-            // Source span extends to include the value
-            (
-                Some(self.make_template_binding_identifier(value_source, value_start, value_end)),
-                value_end,
-            )
+            Some(self.make_template_binding_identifier(value_source, value_start, value_end))
         } else {
             // For bare `let item`, Angular expects no value (None)
-            // Source span includes trailing space after the variable name
-            (None, key_end + 1)
+            None
         };
 
-        // Source span starts from 'let' keyword
-        let source_span = AbsoluteSourceSpan::new(let_start, source_end);
+        // The span runs from `let` over the statement terminator, up to the next binding.
+        // Reference: parser.ts lines 1637-1640 (`parseLetBinding`)
+        self.consume_statement_terminator();
+        let source_span = AbsoluteSourceSpan::new(let_start, self.current_absolute_offset());
         Some(TemplateBinding::Variable(VariableBinding { source_span, key, value }))
     }
 
@@ -716,8 +717,12 @@ impl<'a> Parser<'a> {
         if self.at_end()
             || self.peek().map(|t| t.is_character(';') || t.is_character(',')).unwrap_or(false)
         {
-            // No value - `*ngIf="cond; else elseBlock"` where `else` has no value
-            let source_span = AbsoluteSourceSpan::new(keyword_start, keyword_end);
+            // No value - `*ngIf="cond; else elseBlock"` where `else` has no value.
+            // The span takes in the statement terminator and the whitespace up to the next
+            // binding. Reference: parser.ts lines 1559-1562 (`parseDirectiveKeywordBindings`)
+            self.consume_statement_terminator();
+            let source_span =
+                AbsoluteSourceSpan::new(keyword_start, self.current_absolute_offset());
             result.push(TemplateBinding::Expression(ExpressionBinding {
                 source_span,
                 key: key.clone(),
@@ -731,18 +736,14 @@ impl<'a> Parser<'a> {
         // Value source is just the expression (up to current_end_index)
         let value_end = self.current_end_index();
 
-        // Source span extends to start of next binding (includes trailing separator and whitespace)
-        // If the next token is `;` or `,`, consume it and use the start of the following token
-        let source_end =
-            if self.peek().map(|t| t.is_character(';') || t.is_character(',')).unwrap_or(false) {
-                // Consume the separator
-                self.advance();
-                // Source span extends to start of next token (after separator)
-                self.peek().map(|t| t.index).unwrap_or(self.source.len() as u32)
-            } else {
-                // No separator, source span extends to start of next token
-                self.peek().map(|t| t.index).unwrap_or(self.source.len() as u32)
-            };
+        // Source span extends to the start of the next binding: before an `as` binding, or else
+        // over the statement terminator and the whitespace after it (at the end of the input,
+        // to the end of the last token).
+        // Reference: parser.ts lines 1551-1562 (`parseDirectiveKeywordBindings`)
+        if !self.peek().is_some_and(|t| t.is_keyword_value("as")) {
+            self.consume_statement_terminator();
+        }
+        let source_end = self.current_absolute_offset();
 
         let value_source = &self.source[expr_start as usize..value_end as usize];
         let ast_with_source = ASTWithSource {
@@ -752,7 +753,7 @@ impl<'a> Parser<'a> {
             absolute_offset: self.absolute_offset + expr_start,
         };
 
-        let source_span = AbsoluteSourceSpan::new(keyword_start, self.absolute_offset + source_end);
+        let source_span = AbsoluteSourceSpan::new(keyword_start, source_end);
         result.push(TemplateBinding::Expression(ExpressionBinding {
             source_span,
             key,
@@ -801,8 +802,11 @@ impl<'a> Parser<'a> {
             value_key_span.end,
         );
 
-        // Source span extends from directive name start to alias end
-        let source_span = AbsoluteSourceSpan::new(source_span_start, alias_end);
+        // The span runs from the value's key over the statement terminator, up to the next
+        // binding. Reference: parser.ts lines 1612-1614 (`parseAsBinding`)
+        self.consume_statement_terminator();
+        let source_span =
+            AbsoluteSourceSpan::new(source_span_start, self.current_absolute_offset());
         Some(TemplateBinding::Variable(VariableBinding { source_span, key, value: Some(value) }))
     }
 
@@ -1072,6 +1076,12 @@ impl<'a> Parser<'a> {
     /// Returns true if at end of tokens.
     fn at_end(&self) -> bool {
         self.index >= self.tokens.len()
+    }
+
+    /// The absolute offset of the next token, or of the end of the last one at the end of the
+    /// input. Reference: parser.ts lines 619-645 (`inputIndex`, `currentAbsoluteOffset`)
+    fn current_absolute_offset(&self) -> u32 {
+        self.absolute_offset + self.peek().map_or_else(|| self.current_end_index(), |t| t.index)
     }
 
     /// Returns the end position of the previous token (like Angular's currentEndIndex).
@@ -1806,7 +1816,6 @@ impl<'a> Parser<'a> {
                 if self.is_assignment_operator(token) {
                     // Clone the operation first to avoid borrow issues
                     let operation = token.str_value.clone();
-                    let result_span = result.span();
 
                     // In binding mode, still parse the full expression but emit an error
                     // This ensures spans cover the entire expression
@@ -1825,9 +1834,13 @@ impl<'a> Parser<'a> {
                     // Parse the value expression
                     let right = self.parse_conditional();
 
-                    // Create Binary expression for assignment
+                    // Create Binary expression for assignment. It starts where the chain
+                    // starts, as `this.span(start)` in Angular's `parseAccessMember`
+                    // (parser.ts line 1356). Not at `result.span()`: the span of a plain
+                    // identifier read holds absolute offsets (`make_absolute_spans`), which
+                    // `to_absolute` would offset a second time.
                     let end = self.current_end_index();
-                    let assign_span = ParseSpan::new(result_span.start, end);
+                    let assign_span = ParseSpan::new(start, end);
                     let assign_source_span = assign_span.to_absolute(self.absolute_offset);
                     let binary_op = self.string_to_binary_operator(&operation);
                     let binary = Binary {
