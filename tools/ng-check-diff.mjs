@@ -4,10 +4,16 @@
 //
 //   node tools/ng-check-diff.mjs <oracle dir> <ngcheck dir> [--show N]
 //
-// Imports are not compared: ngtsc writes module specifiers relative to absolute paths, ngcheck the sources' own
-// specifiers (as Angular's prototype does); both name the same files. Exit status 1 when a function differs.
+// Functions are matched by their component (the type of `this`): ngtsc numbers a file's blocks without the ones it
+// inlines into the component's own file (`_tcb_<pos>`, not in the oracle), while ngcheck, as Angular's prototype,
+// numbers every component and generates a whole file inline when one of its components needs it. In such a file
+// (it holds the component's own source) names are unqualified, so import qualifiers (`i1.`) are dropped from both
+// sides. Imports are not compared: ngtsc writes module specifiers relative to absolute paths, ngcheck the sources'
+// own specifiers (as Angular's prototype does); both name the same files. Exit status 1 when a function differs.
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import {join, relative} from 'node:path';
+
+import {tcbFunctions as functions} from './ng-check-tcb.mjs';
 
 const [oracleDir, oursDir, ...rest] = process.argv.slice(2);
 const show = rest[0] === '--show' ? Number(rest[1]) : 5;
@@ -22,22 +28,6 @@ function* walk(dir) {
     if (statSync(path).isDirectory()) yield* walk(path);
     else if (name.endsWith('.ngtypecheck.ts')) yield path;
   }
-}
-
-// The type-check functions of a file: `/*tcbN*/` (ngtsc) or the function name, mapped to the function's text
-function functions(text) {
-  const out = new Map();
-  const re = /^function (_tcb\d+)\b/gm;
-  const starts = [...text.matchAll(re)].map((m) => ({name: m[1], index: m.index}));
-  for (let i = 0; i < starts.length; i++) {
-    const end = i + 1 < starts.length ? starts[i + 1].index : text.length;
-    let body = text.slice(starts[i].index, end);
-    // up to the function's closing brace at column 0, without what follows (the next id comment, a footer)
-    const close = body.search(/^}\s*$/m);
-    if (close >= 0) body = body.slice(0, close + 1);
-    out.set(starts[i].name, body.trimEnd());
-  }
-  return out;
 }
 
 let files = 0, same = 0, differ = 0, missing = 0, extra = 0;
@@ -55,13 +45,16 @@ for (const oraclePath of walk(oracleDir)) {
     if (shown.length < show) shown.push(`MISSING ${rel} (${expected.size} functions)`);
     continue;
   }
+  // an inline file: the component's source is in it (its classes are declared, not imported)
+  const inline = /^(export )?(abstract )?class \w+/m.test(actualText);
+  const strip = (body) => (inline ? body.replace(/\bi\d+\./g, '') : body);
   const actual = functions(actualText);
   for (const [name, body] of expected) {
     const ours = actual.get(name);
     if (ours === undefined) {
       missing++;
       if (shown.length < show) shown.push(`MISSING ${rel} ${name}`);
-    } else if (ours === body) {
+    } else if (strip(ours) === strip(body)) {
       same++;
     } else {
       differ++;

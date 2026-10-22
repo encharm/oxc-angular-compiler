@@ -5,6 +5,8 @@
 //
 // Writes, under <out dir>, every type-check file ngtsc generated (`<path relative to the tsconfig's directory>`, with `__` for `..`,
 // `.ngtypecheck.ts`) and `diagnostics.json` (the errors and warnings ngc reports: file, start, length, code, message).
+// The blocks ngtsc inlines into a component's own file (`function _tcb_<pos>`, for a component it cannot import) are
+// appended to that file's `.ngtypecheck.ts`.
 // The project needs its own node_modules (@angular/core, ...). The compiler is Angular's per-commit build of
 // @angular/compiler-cli and @angular/compiler (github.com/angular/*-builds), installed once into
 // node_modules/.cache/ng-check-oracle/<commit> with the TypeScript it requires.
@@ -55,6 +57,7 @@ if (!existsSync(join(cache, 'node_modules/@angular/compiler-cli'))) {
 
 const require = createRequire(join(cache, 'package.json'));
 const ngtsc = await import(pathToFileURL(require.resolve('@angular/compiler-cli')).href);
+const ts = require('typescript');
 const config = ngtsc.readConfiguration(tsconfig);
 const options = {...config.options, noEmit: true};
 const program = ngtsc.createProgram({
@@ -68,15 +71,30 @@ const diagnostics = [...program.getTsSemanticDiagnostics(), ...program.getNgStru
 const base = dirname(tsconfig);
 mkdirSync(out, {recursive: true});
 let files = 0;
+// a file outside the tsconfig's directory stays inside <out dir>: each `../` becomes `__/`
+const outPath = (fileName) => join(out, relative(base, fileName).replace(/\.\.(?=[\\/])/g, '__'));
 // the program ngtsc type-checks, with the type-check files in it
 const checked = program.compiler.getCurrentProgram();
+const inline = [];
 for (const sf of checked.getSourceFiles()) {
-  if (!sf.fileName.endsWith('.ngtypecheck.ts') || sf.text.trim().startsWith('export const IS_A_MODULE')) continue;
-  // a file outside the tsconfig's directory stays inside <out dir>: each `../` becomes `__/`
-  const path = join(out, relative(base, sf.fileName).replace(/\.\.(?=[\\/])/g, '__'));
+  if (!sf.fileName.endsWith('.ngtypecheck.ts')) {
+    // inline blocks: the file's top-level `_tcb_<pos>` functions
+    const blocks = sf.statements
+      .filter((st) => ts.isFunctionDeclaration(st) && st.name?.text.startsWith('_tcb_'))
+      .map((st) => sf.text.slice(st.getStart(sf), st.end));
+    if (blocks.length > 0) inline.push({path: outPath(sf.fileName.replace(/\.ts$/, '.ngtypecheck.ts')), blocks});
+    continue;
+  }
+  if (sf.text.trim().startsWith('export const IS_A_MODULE')) continue;
+  const path = outPath(sf.fileName);
   mkdirSync(dirname(path), {recursive: true});
   writeFileSync(path, sf.text);
   files++;
+}
+for (const {path, blocks} of inline) {
+  mkdirSync(dirname(path), {recursive: true});
+  const before = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  writeFileSync(path, before + '\n// inlined into the component file by ngtsc\n' + blocks.join('\n\n') + '\n');
 }
 const message = (m) => (typeof m === 'string' ? m : `${m.messageText}${(m.next ?? []).map((n) => '\n' + message(n)).join('')}`);
 const reported = diagnostics
