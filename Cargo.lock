@@ -944,6 +944,8 @@ dependencies = [
  "oxc_ast_visit 0.155.0",
  "oxc_parser 0.155.0",
  "oxc_span 0.155.0",
+ "oxc_str 0.155.0",
+ "oxc_syntax 0.155.0",
  "rustc-hash",
  "serde",
  "serde_json",

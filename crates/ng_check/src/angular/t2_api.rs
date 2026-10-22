@@ -10,10 +10,12 @@ use indexmap::IndexSet;
 use oxc_angular_compiler::ast::expression::{AngularExpression, BindingPipe};
 use oxc_angular_compiler::ast::r3::{
     R3BoundAttribute, R3BoundEvent, R3Component, R3Content, R3DeferredBlock, R3DeferredBlockError,
-    R3DeferredBlockLoading, R3DeferredBlockPlaceholder, R3DeferredTrigger, R3Directive, R3Element,
+    R3DeferredBlockLoading, R3DeferredBlockPlaceholder, R3Directive, R3Element, R3HoverDeferredTrigger,
+    R3InteractionDeferredTrigger, R3ViewportDeferredTrigger,
     R3ForLoopBlock, R3ForLoopBlockEmpty, R3HostElement, R3IfBlockBranch, R3LetDeclaration, R3Node,
     R3Reference, R3SwitchBlockCaseGroup, R3Template, R3TextAttribute, R3Variable,
 };
+use oxc_str::Ident;
 use rustc_hash::FxBuildHasher;
 
 use crate::angular::property_mapping::{AsInputOrOutput, ClassPropertyMapping, InputOrOutput};
@@ -190,6 +192,30 @@ impl Binding<'_> {
 }
 keyed!(Binding);
 
+/// `HoverDeferredTrigger | InteractionDeferredTrigger | ViewportDeferredTrigger`: the triggers that reference an
+/// element.
+///
+/// `get_deferred_trigger_target` resolves them (Angular's takes any `DeferredTrigger` and returns `null` for
+/// the others). The fork's `R3DeferredBlockTriggers` holds each trigger inline, by kind, so a `&R3DeferredTrigger`
+/// cannot be made from one.
+#[derive(Debug, Clone, Copy)]
+pub enum ReferenceDeferredTrigger<'a> {
+    Hover(&'a R3HoverDeferredTrigger<'a>),
+    Interaction(&'a R3InteractionDeferredTrigger<'a>),
+    Viewport(&'a R3ViewportDeferredTrigger<'a>),
+}
+
+impl<'a> ReferenceDeferredTrigger<'a> {
+    /// `trigger.reference`
+    pub fn reference(&self) -> Option<&'a str> {
+        match self {
+            Self::Hover(t) => t.reference.as_ref().map(Ident::as_str),
+            Self::Interaction(t) => t.reference.as_ref().map(Ident::as_str),
+            Self::Viewport(t) => t.reference.as_ref().map(Ident::as_str),
+        }
+    }
+}
+
 // t2_api.ts:65 ConflictingHostDirectiveBinding
 #[derive(Debug, Clone)]
 pub struct ConflictingHostDirectiveBinding<D> {
@@ -278,7 +304,7 @@ pub trait BoundTarget<'a, D> {
     fn get_deferred_trigger_target(
         &self,
         block: &'a R3DeferredBlock<'a>,
-        trigger: &'a R3DeferredTrigger<'a>,
+        trigger: ReferenceDeferredTrigger<'a>,
     ) -> Option<&'a R3Element<'a>>;
     fn is_deferred(&self, node: DirectiveOwner<'a>) -> bool;
     fn get_defer_blocks_of_node(&self, node: DirectiveOwner<'a>) -> Vec<&'a R3DeferredBlock<'a>>;
