@@ -15,6 +15,7 @@ use oxc_angular_compiler::ast::r3::{
     R3ForLoopBlock, R3ForLoopBlockEmpty, R3HostElement, R3IfBlockBranch, R3LetDeclaration, R3Node,
     R3Reference, R3SwitchBlockCaseGroup, R3Template, R3TextAttribute, R3Variable,
 };
+use oxc_str::Ident;
 use rustc_hash::FxBuildHasher;
 
 use crate::angular::property_mapping::{AsInputOrOutput, ClassPropertyMapping, InputOrOutput};
@@ -192,7 +193,9 @@ impl Binding<'_> {
 keyed!(Binding);
 
 /// `HoverDeferredTrigger | InteractionDeferredTrigger | ViewportDeferredTrigger`: the triggers that reference an
-/// element, which `get_deferred_trigger_target` resolves (Angular's takes any `DeferredTrigger` and returns `null` for
+/// element.
+///
+/// `get_deferred_trigger_target` resolves them (Angular's takes any `DeferredTrigger` and returns `null` for
 /// the others). The fork's `R3DeferredBlockTriggers` holds each trigger inline, by kind, so a `&R3DeferredTrigger`
 /// cannot be made from one.
 #[derive(Debug, Clone, Copy)]
@@ -206,9 +209,9 @@ impl<'a> ReferenceDeferredTrigger<'a> {
     /// `trigger.reference`
     pub fn reference(&self) -> Option<&'a str> {
         match self {
-            Self::Hover(t) => t.reference.as_ref().map(|r| r.as_str()),
-            Self::Interaction(t) => t.reference.as_ref().map(|r| r.as_str()),
-            Self::Viewport(t) => t.reference.as_ref().map(|r| r.as_str()),
+            Self::Hover(t) => t.reference.as_ref().map(Ident::as_str),
+            Self::Interaction(t) => t.reference.as_ref().map(Ident::as_str),
+            Self::Viewport(t) => t.reference.as_ref().map(Ident::as_str),
         }
     }
 }

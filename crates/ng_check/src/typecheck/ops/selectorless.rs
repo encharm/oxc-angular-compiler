@@ -28,7 +28,11 @@ pub struct TcbComponentNodeOp<'a, 'b> {
 
 impl<'a, 'b> TcbComponentNodeOp<'a, 'b> {
     // selectorless.ts:30 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, component: &'a R3Component<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        component: &'a R3Component<'a>,
+    ) -> Self {
         Self { tcb, scope, component }
     }
 }
@@ -43,9 +47,11 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbComponentNodeOp<'a, 'b> {
     fn execute(&self) -> Option<TcbExpr> {
         let id = self.tcb.allocate_id();
         // (`this.component.startSourceSpan || this.component.sourceSpan`: the start span is always set.)
-        let initializer =
-            TcbExpr::new(format!("document.createElement(\"{}\")", get_component_tag_name(self.component)))
-                .add_parse_span_info(self.component.start_source_span);
+        let initializer = TcbExpr::new(format!(
+            "document.createElement(\"{}\")",
+            get_component_tag_name(self.component)
+        ))
+        .add_parse_span_info(self.component.start_source_span);
         self.scope.add_statement(TcbExpr::new(format!("var {id} = {}", initializer.p())));
         Some(TcbExpr::new(id))
     }

@@ -18,6 +18,9 @@ impl CssSelector {
 
     /// `parse` for a `try { CssSelector.parse(...) } catch`: the error instead of the panic (requested from
     /// `matching`).
+    ///
+    /// # Errors
+    /// Where `parse` throws.
     pub fn try_parse(_selector: &str) -> Result<Vec<CssSelector>, String> {
         todo!("ported by matching")
     }

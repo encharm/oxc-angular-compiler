@@ -3,7 +3,7 @@
 
 use oxc_angular_compiler::ast::r3::R3Element;
 
-use crate::angular::t2_api::DirectiveOwner;
+use crate::typecheck::oob::DirectiveHost;
 use crate::typecheck::api::{DirectiveRef, TcbDirectiveMetadata};
 use crate::typecheck::ops::base::{ScopeRef, TcbOp, TcbRef};
 use crate::typecheck::ops::bindings::TcbBoundAttribute;
@@ -21,7 +21,7 @@ pub struct TcbNativeFieldOp<'a, 'b> {
     _tcb: TcbRef<'a, 'b>,
     _scope: ScopeRef<'a, 'b>,
     _node: &'a R3Element<'a>,
-    _input_type: Option<String>,
+    _input_type: Option<&'a str>,
 }
 
 impl<'a, 'b> TcbNativeFieldOp<'a, 'b> {
@@ -29,7 +29,7 @@ impl<'a, 'b> TcbNativeFieldOp<'a, 'b> {
         tcb: TcbRef<'a, 'b>,
         scope: ScopeRef<'a, 'b>,
         node: &'a R3Element<'a>,
-        input_type: Option<String>,
+        input_type: Option<&'a str>,
     ) -> Self {
         Self { _tcb: tcb, _scope: scope, _node: node, _input_type: input_type }
     }
@@ -69,7 +69,7 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbNativeRadioButtonFieldOp<'a, 'b> {
 // signal_forms.ts:249 expandBoundAttributesForField (stub)
 pub fn expand_bound_attributes_for_field<'a>(
     _directive: &TcbDirectiveMetadata,
-    _node: DirectiveOwner<'a>,
+    _node: DirectiveHost<'a>,
     _custom_form_control_type: Option<CustomFormControlType>,
 ) -> Option<Vec<TcbBoundAttribute<'a>>> {
     todo!("ported by tcb-ops")
@@ -81,7 +81,7 @@ pub fn get_custom_field_directive_type(_meta: &TcbDirectiveMetadata) -> Option<C
 }
 
 // signal_forms.ts:380 isNativeField (stub): true only for an `Element` (`node is Element & {name: ...}`)
-pub fn is_native_field(_dir: &TcbDirectiveMetadata, _node: DirectiveOwner<'_>, _all_directive_matches: &[DirectiveRef]) -> bool {
+pub fn is_native_field(_dir: &TcbDirectiveMetadata, _node: DirectiveHost<'_>, _all_directive_matches: &[DirectiveRef]) -> bool {
     todo!("ported by tcb-ops")
 }
 

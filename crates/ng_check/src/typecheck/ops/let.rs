@@ -16,7 +16,11 @@ pub struct TcbLetDeclarationOp<'a, 'b> {
 
 impl<'a, 'b> TcbLetDeclarationOp<'a, 'b> {
     // let.ts:20 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, node: &'a R3LetDeclaration<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        node: &'a R3LetDeclaration<'a>,
+    ) -> Self {
         Self { tcb, scope, node }
     }
 }
@@ -32,7 +36,8 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbLetDeclarationOp<'a, 'b> {
     // let.ts:34 execute
     fn execute(&self) -> Option<TcbExpr> {
         let id = TcbExpr::new(self.tcb.allocate_id()).add_parse_span_info(self.node.name_span);
-        let value = tcb_expression(&self.node.value, &self.tcb, &self.scope).wrap_for_type_checker();
+        let value =
+            tcb_expression(&self.node.value, &self.tcb, &self.scope).wrap_for_type_checker();
         // Value needs to be wrapped, because spans for the expressions inside of it can
         // be picked up incorrectly as belonging to the full variable declaration.
         let var_statement = TcbExpr::new(format!("const {} = {}", id.p(), value.p()));

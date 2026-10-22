@@ -3,17 +3,17 @@
 
 use oxc_angular_compiler::ast::r3::R3BoundAttribute;
 
-use crate::angular::t2_api::DirectiveOwner;
+use crate::typecheck::oob::DirectiveHost;
 use crate::typecheck::api::{DirectiveRef, Set};
 use crate::typecheck::ops::base::{ScopeRef, TcbOp, TcbRef};
-use crate::typecheck::ops::bindings::TcbBoundAttributeValue;
+use crate::typecheck::ops::bindings::TcbBindingValue;
 use crate::typecheck::ops::codegen::TcbExpr;
 use crate::typecheck::ops::references::LocalSymbol;
 use crate::typecheck::ops::signal_forms::CustomFormControlType;
 
 // inputs.ts:34 translateInput (stub)
 pub fn translate_input<'a, 'b>(
-    _value: &TcbBoundAttributeValue<'a>,
+    _value: TcbBindingValue<'a>,
     _tcb: &TcbRef<'a, 'b>,
     _scope: &ScopeRef<'a, 'b>,
 ) -> TcbExpr {
@@ -24,7 +24,7 @@ pub fn translate_input<'a, 'b>(
 pub struct TcbDirectiveInputsOp<'a, 'b> {
     _tcb: TcbRef<'a, 'b>,
     _scope: ScopeRef<'a, 'b>,
-    _node: DirectiveOwner<'a>,
+    _node: DirectiveHost<'a>,
     _dir: DirectiveRef,
     _is_form_control: bool,
     _custom_form_control_type: Option<CustomFormControlType>,
@@ -34,7 +34,7 @@ impl<'a, 'b> TcbDirectiveInputsOp<'a, 'b> {
     pub fn new(
         tcb: TcbRef<'a, 'b>,
         scope: ScopeRef<'a, 'b>,
-        node: DirectiveOwner<'a>,
+        node: DirectiveHost<'a>,
         dir: DirectiveRef,
         is_form_control: bool,
         custom_form_control_type: Option<CustomFormControlType>,

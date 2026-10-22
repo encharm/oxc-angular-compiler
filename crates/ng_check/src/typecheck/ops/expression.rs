@@ -1,9 +1,6 @@
 //! `packages/compiler/src/typecheck/ops/expression.ts`
 //!
-//! `TcbExpressionTranslator` has subclasses (`TcbForLoopTrackTranslator`, `TcbEventHandlerTranslator`) that override
-//! `resolve` and `isValidLetDeclarationAccess` and call `super.resolve`. Here the class's data is the struct
-//! `TcbExpressionTranslator`, its overridable methods are the trait `ExpressionTranslator` (whose default methods are
-//! the base class's), and `super.resolve(ast)` is `TcbExpressionTranslator::resolve_base(self, ast)`.
+//! `TcbExpressionTranslator` is a trait (it has subclasses): see its comment.
 
 use std::rc::Rc;
 
@@ -25,13 +22,14 @@ pub fn tcb_expression<'a, 'b>(
     tcb: &TcbRef<'a, 'b>,
     scope: &ScopeRef<'a, 'b>,
 ) -> TcbExpr {
-    let translator = TcbExpressionTranslator::new(Rc::clone(tcb), Rc::clone(scope));
+    let translator = BaseTcbExpressionTranslator::new(Rc::clone(tcb), Rc::clone(scope));
     translator.translate(ast)
 }
 
 // expression.ts:43 unwrapWritableSignal
 /// Wraps an expression in an `unwrapSignal` call which extracts the signal's value.
-pub fn unwrap_writable_signal(expression: &TcbExpr, tcb: &Context<'_, '_>) -> TcbExpr {
+#[expect(clippy::needless_pass_by_value, reason = "TypeScript's signature, which the callers use")]
+pub fn unwrap_writable_signal(expression: TcbExpr, tcb: &Context<'_, '_>) -> TcbExpr {
     // `R3Identifiers.unwrapWritableSignal`
     let unwrap_ref = tcb.env.reference_external_symbol("@angular/core", "ɵunwrapWritableSignal");
     TcbExpr::new(format!("{}({})", unwrap_ref.p(), expression.p()))
@@ -49,7 +47,11 @@ pub struct TcbExpressionOp<'a, 'b> {
 
 impl<'a, 'b> TcbExpressionOp<'a, 'b> {
     // expression.ts:57 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, expression: &'a AngularExpression<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        expression: &'a AngularExpression<'a>,
+    ) -> Self {
         Self { tcb, scope, expression }
     }
 }
@@ -70,6 +72,7 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbExpressionOp<'a, 'b> {
 
 // expression.ts:83 TcbConditionOp
 /// A `TcbOp` which renders an Angular expression inside a conditional context.
+///
 /// This is used for `@defer` triggers (`when`, `prefetch when`, `hydrate when`)
 /// to enable TypeScript's TS2774 diagnostic for uninvoked functions/signals.
 ///
@@ -82,7 +85,11 @@ pub struct TcbConditionOp<'a, 'b> {
 
 impl<'a, 'b> TcbConditionOp<'a, 'b> {
     // expression.ts:84 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, expression: &'a AngularExpression<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        expression: &'a AngularExpression<'a>,
+    ) -> Self {
         Self { tcb, scope, expression }
     }
 }
@@ -102,25 +109,23 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbConditionOp<'a, 'b> {
     }
 }
 
-// expression.ts:104 TcbExpressionTranslator: the class's data (`tcb`, `scope`)
-pub struct TcbExpressionTranslator<'a, 'b> {
-    pub tcb: TcbRef<'a, 'b>,
-    pub scope: ScopeRef<'a, 'b>,
-}
+// expression.ts:104 TcbExpressionTranslator. A class with subclasses (`TcbEventHandlerTranslator` in events.rs,
+// `TcbForLoopTrackTranslator` in for_block.rs): a trait whose provided methods are the base class's. A subclass
+// implements the accessors and overrides `resolve` / `is_valid_let_declaration_access`, reaching the base class's
+// `resolve` (`super.resolve`) through `base_resolve`. The base class itself is `BaseTcbExpressionTranslator`.
+pub trait TcbExpressionTranslator<'a: 'b, 'b> {
+    /// `this.tcb`
+    fn tcb(&self) -> &TcbRef<'a, 'b>;
 
-/// The methods of `TcbExpressionTranslator`, which a subclass overrides (`resolve`, `is_valid_let_declaration_access`)
-/// or inherits. A subclass is a struct holding a `TcbExpressionTranslator` (returned by `translator`) that implements
-/// this trait; its `resolve` calls `TcbExpressionTranslator::resolve_base(self, ast)` for `super.resolve(ast)`.
-pub trait ExpressionTranslator<'a, 'b> {
-    /// The `TcbExpressionTranslator` part of the object (`this.tcb`, `this.scope`)
-    fn translator(&self) -> &TcbExpressionTranslator<'a, 'b>;
+    /// `this.scope`
+    fn scope(&self) -> &ScopeRef<'a, 'b>;
 
     // expression.ts:110 translate
     fn translate(&self, ast: &'a AngularExpression<'a>) -> TcbExpr {
         // `astToTcbExpr` actually does the conversion. A special resolver `tcbResolve` is passed
         // which interprets specific expression nodes that interact with the `ImplicitReceiver`. These
         // nodes actually refer to identifiers within the current scope.
-        let config = self.translator().tcb.env.config();
+        let config = self.tcb().env.config();
         ast_to_tcb_expr(ast, &|ast| self.resolve(ast), config)
     }
 
@@ -130,35 +135,13 @@ pub trait ExpressionTranslator<'a, 'b> {
     /// Some `AST` expressions refer to top-level concepts (references, variables, the component
     /// context). This method assists in resolving those.
     fn resolve(&self, ast: &'a AngularExpression<'a>) -> Option<TcbExpr> {
-        TcbExpressionTranslator::resolve_base(self, ast)
+        self.base_resolve(ast)
     }
 
-    // expression.ts:311 isValidLetDeclarationAccess
-    fn is_valid_let_declaration_access(&self, target: &'a R3LetDeclaration<'a>, ast: &'a PropertyRead<'a>) -> bool {
-        TcbExpressionTranslator::is_valid_let_declaration_access_base(self, target, ast)
-    }
-}
-
-impl<'a, 'b> ExpressionTranslator<'a, 'b> for TcbExpressionTranslator<'a, 'b> {
-    fn translator(&self) -> &TcbExpressionTranslator<'a, 'b> {
-        self
-    }
-}
-
-impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
-    // expression.ts:105 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>) -> Self {
-        Self { tcb, scope }
-    }
-
-    /// expression.ts:123 resolve, the base class's (`super.resolve(ast)`); `this` is the object it runs for, whose
-    /// overrides it calls.
-    pub fn resolve_base<T: ExpressionTranslator<'a, 'b> + ?Sized>(
-        this: &T,
-        ast: &'a AngularExpression<'a>,
-    ) -> Option<TcbExpr> {
+    /// expression.ts:123 resolve, the base class's (`super.resolve`)
+    fn base_resolve(&self, ast: &'a AngularExpression<'a>) -> Option<TcbExpr> {
         use AngularExpression as E;
-        let tcb = &this.translator().tcb;
+        let tcb = self.tcb();
         match ast {
             E::PropertyRead(read) if matches!(read.receiver, E::ImplicitReceiver(_)) => {
                 // Try to resolve a bound target for this expression. If no such target is available, then
@@ -166,9 +149,10 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                 // returned here to let it fall through resolution so it will be caught when the
                 // `ImplicitReceiver` is resolved in the branch below.
                 let target = tcb.bound_target.get_expression_target(ast);
-                let target_expression = target.map(|target| Self::get_target_node_expression(this, target, ast));
+                let target_expression =
+                    target.map(|target| get_target_node_expression(self, target, ast));
                 if let Some(TemplateEntity::LetDeclaration(target)) = target
-                    && !this.is_valid_let_declaration_access(target, read)
+                    && !self.is_valid_let_declaration_access(target, read)
                 {
                     tcb.oob_recorder.let_used_before_definition(&tcb.id, read, target);
                     // Cast the expression to `any` so we don't produce additional diagnostics.
@@ -195,10 +179,11 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
 
                 let target = tcb.bound_target.get_expression_target(read)?;
 
-                let target_expression = Self::get_target_node_expression(this, target, read);
+                let target_expression = get_target_node_expression(self, target, read);
 
-                let expr = this.translate(&binary.right);
-                let mut result = TcbExpr::new(format!("({} = {})", target_expression.p(), expr.p()));
+                let expr = self.translate(&binary.right);
+                let mut result =
+                    TcbExpr::new(format!("({} = {})", target_expression.p(), expr.p()));
 
                 result = result.add_parse_span_info(read.source_span());
 
@@ -228,7 +213,7 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                 Some(TcbExpr::new("this"))
             }
             E::BindingPipe(pipe_ast) => {
-                let expr = this.translate(&pipe_ast.exp);
+                let expr = self.translate(&pipe_ast.exp);
                 let pipe_meta = tcb.get_pipe_by_name(&pipe_ast.name);
                 let pipe = match pipe_meta {
                     None => {
@@ -242,7 +227,8 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                         let enclosing_blocks = tcb.bound_target.get_defer_blocks_of_pipe(pipe_ast);
                         let is_deferred = !enclosing_blocks.is_empty();
                         if !is_deferred {
-                            tcb.oob_recorder.deferred_pipe_used_eagerly(&tcb.id, pipe_ast, None, None);
+                            tcb.oob_recorder
+                                .deferred_pipe_used_eagerly(&tcb.id, pipe_ast, None, None);
                             TcbExpr::new("(0 as any)")
                         } else if let Some(deferred_blocks) = &pipe_meta.deferred_blocks {
                             // `b.definedName !== null && pipeMeta.deferredBlocks.has(b.definedName)`: the fork's
@@ -253,7 +239,8 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                             } else {
                                 // `enclosingBlocks[enclosingBlocks.length - 1].definedName ?? 'unnamed'`
                                 let current_block_name = "unnamed";
-                                let declared_blocks: Vec<String> = deferred_blocks.iter().cloned().collect();
+                                let declared_blocks: Vec<String> =
+                                    deferred_blocks.iter().cloned().collect();
                                 tcb.oob_recorder.deferred_pipe_used_eagerly(
                                     &tcb.id,
                                     pipe_ast,
@@ -269,9 +256,10 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                     // Use a variable declared as the pipe's type.
                     Some(pipe_meta) => tcb.env.pipe_inst(pipe_meta),
                 };
-                let args: Vec<String> = pipe_ast.args.iter().map(|arg| this.translate(arg).p()).collect();
-                let mut method_access =
-                    TcbExpr::new(format!("{}.transform", pipe.p())).add_parse_span_info(pipe_ast.name_span);
+                let args: Vec<String> =
+                    pipe_ast.args.iter().map(|arg| self.translate(arg).p()).collect();
+                let mut method_access = TcbExpr::new(format!("{}.transform", pipe.p()))
+                    .add_parse_span_info(pipe_ast.name_span);
 
                 if !tcb.env.config().check_type_of_pipes {
                     method_access = TcbExpr::new(format!("({} as any)", method_access.p()));
@@ -279,7 +267,8 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
 
                 let mut all_args = vec![expr.p()];
                 all_args.extend(args);
-                let result = TcbExpr::new(format!("{}({})", method_access.p(), all_args.join(", ")));
+                let result =
+                    TcbExpr::new(format!("{}({})", method_access.p(), all_args.join(", ")));
                 Some(result.add_parse_span_info(pipe_ast.source_span))
             }
             E::Call(_) | E::SafeCall(_) => {
@@ -290,7 +279,9 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                 };
                 let (receiver_receiver, receiver_name, receiver_name_span) = match receiver {
                     E::PropertyRead(read) => (&read.receiver, read.name.as_str(), read.name_span),
-                    E::SafePropertyRead(read) => (&read.receiver, read.name.as_str(), read.name_span),
+                    E::SafePropertyRead(read) => {
+                        (&read.receiver, read.name.as_str(), read.name_span)
+                    }
                     // This AST isn't special after all.
                     _ => return None,
                 };
@@ -304,16 +295,18 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                     && receiver_name == "$safeNavigationMigration"
                     && args.len() == 1
                 {
-                    let expr = this.translate(&args[0]);
+                    let expr = self.translate(&args[0]);
                     let result = TcbExpr::new(format!("({})", expr.p()));
                     return Some(result.add_parse_span_info(source_span));
                 }
 
                 // Resolve the special `$any(expr)` syntax to insert a cast of the argument to type `any`.
                 // `$any(expr)` -> `expr as any`
-                if matches!(receiver_receiver, E::ImplicitReceiver(_)) && receiver_name == "$any" && args.len() == 1
+                if matches!(receiver_receiver, E::ImplicitReceiver(_))
+                    && receiver_name == "$any"
+                    && args.len() == 1
                 {
-                    let expr = this.translate(&args[0]);
+                    let expr = self.translate(&args[0]);
                     let result = TcbExpr::new(format!("({} as any)", expr.p()));
                     return Some(result.add_parse_span_info(source_span));
                 }
@@ -324,9 +317,9 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
                 // resolved to the component context.
                 let target = tcb.bound_target.get_expression_target(ast)?;
 
-                let method = Self::get_target_node_expression(this, target, ast);
+                let method = get_target_node_expression(self, target, ast);
                 let method = method.add_parse_span_info(receiver_name_span).wrap_for_type_checker();
-                let args: Vec<String> = args.iter().map(|arg| this.translate(arg).p()).collect();
+                let args: Vec<String> = args.iter().map(|arg| self.translate(arg).p()).collect();
                 let node = TcbExpr::new(format!("{}({})", method.p(), args.join(", ")));
                 Some(node.add_parse_span_info(source_span))
             }
@@ -335,19 +328,9 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
         }
     }
 
-    // expression.ts:305 getTargetNodeExpression
-    fn get_target_node_expression<T: ExpressionTranslator<'a, 'b> + ?Sized>(
-        this: &T,
-        target_node: TemplateEntity<'a>,
-        expression_node: &'a AngularExpression<'a>,
-    ) -> TcbExpr {
-        let expr = this.translator().scope.resolve(LocalSymbol::from(target_node), None);
-        expr.add_parse_span_info(expression_node.source_span())
-    }
-
-    /// expression.ts:311 isValidLetDeclarationAccess, the base class's
-    pub fn is_valid_let_declaration_access_base<T: ExpressionTranslator<'a, 'b> + ?Sized>(
-        this: &T,
+    // expression.ts:311 isValidLetDeclarationAccess
+    fn is_valid_let_declaration_access(
+        &self,
         target: &'a R3LetDeclaration<'a>,
         ast: &'a PropertyRead<'a>,
     ) -> bool {
@@ -359,8 +342,41 @@ impl<'a, 'b> TcbExpressionTranslator<'a, 'b> {
         // are updated before the child views. In practice this means that something like
         // `<ng-template [ngIf]="true">{{value}}</ng-template> @let value = 1;` is valid.
         (target_start < ast_start && ast_start > target_end)
-            || !this.translator().scope.is_local(TemplateEntity::LetDeclaration(target))
+            || !self.scope().is_local(TemplateEntity::LetDeclaration(target))
     }
+}
+
+/// `new TcbExpressionTranslator(tcb, scope)`: the base class itself
+pub struct BaseTcbExpressionTranslator<'a, 'b> {
+    tcb: TcbRef<'a, 'b>,
+    scope: ScopeRef<'a, 'b>,
+}
+
+impl<'a, 'b> BaseTcbExpressionTranslator<'a, 'b> {
+    // expression.ts:105 constructor
+    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>) -> Self {
+        Self { tcb, scope }
+    }
+}
+
+impl<'a, 'b> TcbExpressionTranslator<'a, 'b> for BaseTcbExpressionTranslator<'a, 'b> {
+    fn tcb(&self) -> &TcbRef<'a, 'b> {
+        &self.tcb
+    }
+
+    fn scope(&self) -> &ScopeRef<'a, 'b> {
+        &self.scope
+    }
+}
+
+// expression.ts:305 getTargetNodeExpression
+fn get_target_node_expression<'a: 'b, 'b, T: TcbExpressionTranslator<'a, 'b> + ?Sized>(
+    this: &T,
+    target_node: TemplateEntity<'a>,
+    expression_node: &'a AngularExpression<'a>,
+) -> TcbExpr {
+    let expr = this.scope().resolve(LocalSymbol::from(target_node), None);
+    expr.add_parse_span_info(expression_node.source_span())
 }
 
 /// `packages/compiler/src/expression_parser/ast.ts`:550 unwrapWriteTarget (not in the fork)

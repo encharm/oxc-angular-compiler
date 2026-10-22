@@ -16,7 +16,11 @@ pub struct TcbIntersectionObserverOp<'a, 'b> {
 
 impl<'a, 'b> TcbIntersectionObserverOp<'a, 'b> {
     // intersection_observer.ts:20 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, options: &'a AngularExpression<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        options: &'a AngularExpression<'a>,
+    ) -> Self {
         Self { tcb, scope, options }
     }
 }
@@ -30,7 +34,10 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbIntersectionObserverOp<'a, 'b> {
     // intersection_observer.ts:30 execute
     fn execute(&self) -> Option<TcbExpr> {
         let options = tcb_expression(self.options, &self.tcb, &self.scope);
-        self.scope.add_statement(TcbExpr::new(format!("new IntersectionObserver(null!, {})", options.p())));
+        self.scope.add_statement(TcbExpr::new(format!(
+            "new IntersectionObserver(null!, {})",
+            options.p()
+        )));
         None
     }
 }

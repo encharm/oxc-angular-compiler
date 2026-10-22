@@ -7,19 +7,24 @@ use oxc_span::Span;
 use crate::angular::t2_api::{DirectiveOwner, MatchSource};
 use crate::typecheck::api::{DirectiveRef, Map, TcbDirectiveMetadata};
 use crate::typecheck::comments::ExpressionIdentifier;
+use crate::typecheck::oob::DirectiveHost;
 use crate::typecheck::ops::base::{CircularFallback, ScopeRef, TcbOp, TcbRef};
 use crate::typecheck::ops::bindings::{
-    TcbBoundAttribute, TcbBoundAttributeValue, TcbDirectiveInput, get_bound_attributes, widen_binding,
+    TcbBindingValue, TcbBoundAttribute, TcbDirectiveBoundInput, TcbDirectiveInput,
+    TcbDirectiveUnsetInput, get_bound_attributes, widen_binding,
 };
 use crate::typecheck::ops::codegen::TcbExpr;
 use crate::typecheck::ops::context::Context;
 use crate::typecheck::ops::expression::unwrap_writable_signal;
 use crate::typecheck::ops::inputs::translate_input;
-use crate::typecheck::ops::signal_forms::{CustomFormControlType, expand_bound_attributes_for_field};
+use crate::typecheck::ops::signal_forms::{
+    CustomFormControlType, expand_bound_attributes_for_field,
+};
 
 // directive_constructor.ts:35 TcbDirectiveCtorOp
-/// A `TcbOp` which constructs an instance of a directive with types inferred from its inputs. The
-/// inputs themselves are not checked here; checking of inputs is achieved in `TcbDirectiveInputsOp`.
+/// A `TcbOp` which constructs an instance of a directive with types inferred from its inputs.
+///
+/// The inputs themselves are not checked here; checking of inputs is achieved in `TcbDirectiveInputsOp`.
 /// Any errors reported in this statement are ignored, as the type constructor call is only present
 /// for type-inference.
 ///
@@ -72,18 +77,27 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDirectiveCtorOp<'a, 'b> {
             span = node.source_span;
         } else {
             // (`this.node.startSourceSpan || this.node.sourceSpan`: the start span is always set.)
-            span = match self.node {
-                DirectiveOwner::Element(node) => node.start_source_span,
-                DirectiveOwner::Template(node) => node.start_source_span,
-                DirectiveOwner::Component(node) => node.start_source_span,
-                DirectiveOwner::Directive(node) => node.start_source_span,
-                DirectiveOwner::HostElement(node) => node.source_span,
+            let node = match self.node {
+                DirectiveOwner::Element(node) => DirectiveHost::Element(node),
+                DirectiveOwner::Template(node) => DirectiveHost::Template(node),
+                DirectiveOwner::Component(node) => DirectiveHost::Component(node),
+                DirectiveOwner::Directive(node) => DirectiveHost::Directive(node),
+                DirectiveOwner::HostElement(_) => unreachable!(),
             };
-            bound_attrs = get_bound_attributes(&self.dir, self.node);
+            span = match node {
+                DirectiveHost::Element(node) => node.start_source_span,
+                DirectiveHost::Template(node) => node.start_source_span,
+                DirectiveHost::Component(node) => node.start_source_span,
+                DirectiveHost::Directive(node) => node.start_source_span,
+            };
+            bound_attrs = get_bound_attributes(&self.dir, node);
 
             if let Some(custom_form_control_type) = self.custom_form_control_type {
-                let additional_bindings =
-                    expand_bound_attributes_for_field(&self.dir, self.node, Some(custom_form_control_type));
+                let additional_bindings = expand_bound_attributes_for_field(
+                    &self.dir,
+                    node,
+                    Some(custom_form_control_type),
+                );
 
                 if let Some(additional_bindings) = additional_bindings {
                     bound_attrs.extend(additional_bindings);
@@ -97,13 +111,16 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDirectiveCtorOp<'a, 'b> {
             ExpressionIdentifier::Directive
         };
         let id = id
-            .add_expression_identifier(identifier, self.directive_index.map(|index| index as u32))
+            .add_expression_identifier(
+                identifier,
+                self.directive_index.map(|index| u32::try_from(index).expect("a directive index")),
+            )
             .add_parse_span_info(span);
 
         for attr in &bound_attrs {
             // Skip text attributes if configured to do so.
             if !self.tcb.env.config().check_type_of_attributes
-                && matches!(attr.value, TcbBoundAttributeValue::String(_))
+                && matches!(attr.value, TcbBindingValue::String(_))
             {
                 continue;
             }
@@ -114,17 +131,17 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDirectiveCtorOp<'a, 'b> {
                     continue;
                 }
 
-                let expression = translate_input(&attr.value, &self.tcb, &self.scope);
+                let expression = translate_input(attr.value, &self.tcb, &self.scope);
 
                 generic_inputs.insert(
                     input.field_name.clone(),
-                    TcbDirectiveInput::Binding {
+                    TcbDirectiveInput::Binding(TcbDirectiveBoundInput {
                         field: input.field_name.clone(),
                         expression,
-                        original_expression: attr.value.clone(),
+                        original_expression: attr.value,
                         source_span: attr.source_span,
                         is_two_way_binding: input.is_two_way_binding,
-                    },
+                    }),
                 );
             }
         }
@@ -135,7 +152,9 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDirectiveCtorOp<'a, 'b> {
             if !generic_inputs.contains_key(class_property_name) {
                 generic_inputs.insert(
                     class_property_name.clone(),
-                    TcbDirectiveInput::Unset { field: class_property_name.clone() },
+                    TcbDirectiveInput::Unset(TcbDirectiveUnsetInput {
+                        field: class_property_name.clone(),
+                    }),
                 );
             }
         }
@@ -203,7 +222,11 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDirectiveCtorCircularFallbackOp<'a, 'b> {
 // directive_constructor.ts:170 tcbCallTypeCtor
 /// Call the type constructor of a directive instance on a given template node, inferring a type for
 /// the directive instance from any bound inputs.
-fn tcb_call_type_ctor(dir: &TcbDirectiveMetadata, tcb: &Context<'_, '_>, inputs: &[TcbDirectiveInput<'_>]) -> TcbExpr {
+fn tcb_call_type_ctor(
+    dir: &TcbDirectiveMetadata,
+    tcb: &Context<'_, '_>,
+    inputs: &[TcbDirectiveInput<'_>],
+) -> TcbExpr {
     let type_ctor = tcb.env.type_ctor_for(dir);
     let mut literal = String::from("{ ");
 
@@ -212,34 +235,32 @@ fn tcb_call_type_ctor(dir: &TcbDirectiveMetadata, tcb: &Context<'_, '_>, inputs:
         let is_last = i == inputs.len() - 1;
 
         match input {
-            TcbDirectiveInput::Binding {
-                field,
-                expression,
-                original_expression,
-                source_span,
-                is_two_way_binding,
-            } => {
-                let property_name = TcbExpr::quote_and_escape(field);
+            TcbDirectiveInput::Binding(input) => {
+                let property_name = TcbExpr::quote_and_escape(&input.field);
                 // For bound inputs, the property is assigned the binding expression.
-                let mut expr = widen_binding(expression.clone(), tcb, original_expression);
+                let mut expr =
+                    widen_binding(input.expression.clone(), tcb, input.original_expression);
 
-                if *is_two_way_binding && tcb.env.config().allow_signals_in_two_way_bindings {
-                    expr = unwrap_writable_signal(&expr, tcb);
+                if input.is_two_way_binding && tcb.env.config().allow_signals_in_two_way_bindings {
+                    expr = unwrap_writable_signal(expr, tcb);
                 }
 
-                let assignment = TcbExpr::new(format!("{property_name}: {}", expr.wrap_for_type_checker().p()));
-                let assignment = assignment.add_parse_span_info(*source_span);
+                let assignment =
+                    TcbExpr::new(format!("{property_name}: {}", expr.wrap_for_type_checker().p()));
+                let assignment = assignment.add_parse_span_info(input.source_span);
                 literal.push_str(&assignment.p());
             }
-            TcbDirectiveInput::Unset { field } => {
-                let property_name = TcbExpr::quote_and_escape(field);
+            TcbDirectiveInput::Unset(input) => {
+                let property_name = TcbExpr::quote_and_escape(&input.field);
                 // A type constructor is required to be called with all input properties, so any unset
                 // inputs are simply assigned a value of type `any` to ignore them.
-                literal.push_str(&format!("{property_name}: 0 as any"));
+                literal.push_str(&property_name);
+                literal.push_str(": 0 as any");
             }
         }
 
-        literal.push_str(&format!("{} ", if is_last { "" } else { "," }));
+        literal.push_str(if is_last { "" } else { "," });
+        literal.push(' ');
     }
 
     literal.push('}');

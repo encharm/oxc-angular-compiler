@@ -20,7 +20,12 @@ pub struct TcbBlockImplicitVariableOp<'a, 'b> {
 
 impl<'a, 'b> TcbBlockImplicitVariableOp<'a, 'b> {
     // variables.ts:22 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, r#type: TcbExpr, variable: &'a R3Variable<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        r#type: TcbExpr,
+        variable: &'a R3Variable<'a>,
+    ) -> Self {
         Self { tcb, scope, r#type, variable }
     }
 }
@@ -80,7 +85,8 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbTemplateVariableOp<'a, 'b> {
         // Allocate an identifier for the Variable, and initialize it to a read of the variable
         // on the template context.
         let id = TcbExpr::new(self.tcb.allocate_id());
-        let value = if self.variable.value.is_empty() { "$implicit" } else { self.variable.value.as_str() };
+        let value =
+            if self.variable.value.is_empty() { "$implicit" } else { self.variable.value.as_str() };
         let mut initializer = TcbExpr::new(format!("{}.{value}", ctx.p()));
         let id = id.add_parse_span_info(self.variable.key_span);
 

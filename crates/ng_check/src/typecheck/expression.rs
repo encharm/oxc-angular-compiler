@@ -9,11 +9,11 @@
 //!   (`literal_map_key_span`).
 
 use oxc_angular_compiler::ast::expression::{
-    AngularExpression, ArrowFunction, Binary, BinaryOperator, Call, Chain, Conditional, EmptyExpr, Interpolation,
-    KeyedRead, LiteralArray, LiteralMap, LiteralMapKey, LiteralPrimitive, LiteralValue, NonNullAssert,
-    ParenthesizedExpression, PrefixNot, PropertyRead, RegularExpressionLiteral, SafeCall, SafeKeyedRead,
-    SafePropertyRead, SpreadElement, TaggedTemplateLiteral, TemplateLiteral, TypeofExpression, Unary, UnaryOperator,
-    VoidExpression,
+    AngularExpression, ArrowFunction, Binary, BinaryOperator, Call, Chain, Conditional, EmptyExpr,
+    Interpolation, KeyedRead, LiteralArray, LiteralMap, LiteralMapKey, LiteralPrimitive,
+    LiteralValue, NonNullAssert, ParenthesizedExpression, PrefixNot, PropertyRead,
+    RegularExpressionLiteral, SafeCall, SafeKeyedRead, SafePropertyRead, SpreadElement,
+    TaggedTemplateLiteral, TemplateLiteral, TypeofExpression, Unary, UnaryOperator, VoidExpression,
 };
 use oxc_syntax::number::ToJsString;
 
@@ -40,6 +40,7 @@ struct TcbExprTranslator<'r, 'a> {
     config: &'r TypeCheckingConfig,
 }
 
+#[expect(clippy::unused_self, reason = "the visitor methods of a TypeScript class")]
 impl<'r, 'a> TcbExprTranslator<'r, 'a> {
     // expression.ts:59 constructor
     fn new(maybe_resolve: &'r MaybeResolve<'r, 'a>, config: &'r TypeCheckingConfig) -> Self {
@@ -111,7 +112,9 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
         let rhs = rhs.wrap_for_type_checker();
         let expression = format!("{} {} {}", lhs.p(), ast.operation.as_str(), rhs.p());
         let node = TcbExpr::new(
-            if ast.operation == BinaryOperator::NullishCoalescing || ast.operation == BinaryOperator::Power {
+            if ast.operation == BinaryOperator::NullishCoalescing
+                || ast.operation == BinaryOperator::Power
+            {
                 format!("({expression})")
             } else {
                 expression
@@ -122,7 +125,8 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
 
     // expression.ts:99 visitChain
     fn visit_chain(&self, ast: &'a Chain<'a>) -> TcbExpr {
-        let elements: Vec<String> = ast.expressions.iter().map(|expr| self.translate(expr).p()).collect();
+        let elements: Vec<String> =
+            ast.expressions.iter().map(|expr| self.translate(expr).p()).collect();
         let node = TcbExpr::new(elements.join(", "));
         let node = node.wrap_for_type_checker();
         node.add_parse_span_info(ast.source_span)
@@ -187,8 +191,10 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
 
     // expression.ts:156 visitLiteralArray
     fn visit_literal_array(&self, ast: &'a LiteralArray<'a>) -> TcbExpr {
-        let elements: Vec<TcbExpr> = ast.expressions.iter().map(|expr| self.translate(expr)).collect();
-        let mut literal = format!("[{}]", elements.iter().map(TcbExpr::p).collect::<Vec<_>>().join(", "));
+        let elements: Vec<TcbExpr> =
+            ast.expressions.iter().map(|expr| self.translate(expr)).collect();
+        let mut literal =
+            format!("[{}]", elements.iter().map(TcbExpr::p).collect::<Vec<_>>().join(", "));
 
         if !self.config.strict_literal_types {
             literal = format!("({literal} as any)");
@@ -284,9 +290,11 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
             receiver = receiver.wrap_for_type_checker();
         }
 
-        let node = TcbExpr::new(format!("{}.{}", receiver.p(), ast.name)).add_parse_span_info(ast.name_span);
+        let node = TcbExpr::new(format!("{}.{}", receiver.p(), ast.name))
+            .add_parse_span_info(ast.name_span);
 
-        let result = if is_safe_chain { TcbExpr::new(node.p()) } else { node.wrap_for_type_checker() };
+        let result =
+            if is_safe_chain { TcbExpr::new(node.p()) } else { node.wrap_for_type_checker() };
         result.add_parse_span_info(ast.source_span)
     }
 
@@ -297,7 +305,9 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
 
         let node = if self.config.strict_safe_navigation_types {
             TcbExpr::new(format!("{}?.{}", receiver.p(), name.p()))
-        } else if VeSafeLhsInferenceBugDetector::ve_will_infer_any_for(VeSafeLhsTarget::SafePropertyRead(ast)) {
+        } else if VeSafeLhsInferenceBugDetector::ve_will_infer_any_for(
+            VeSafeLhsTarget::SafePropertyRead(ast),
+        ) {
             TcbExpr::new(format!("({} as any).{}", receiver.p(), name.p()))
         } else {
             TcbExpr::new(format!("({}!.{} as any)", receiver.p(), name.p()))
@@ -312,11 +322,13 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
 
         let node = if self.config.strict_safe_navigation_types {
             TcbExpr::new(format!("{}?.[{}]", receiver.p(), key.p()))
-        } else if VeSafeLhsInferenceBugDetector::ve_will_infer_any_for(VeSafeLhsTarget::SafeKeyedRead(ast)) {
+        } else if VeSafeLhsInferenceBugDetector::ve_will_infer_any_for(
+            VeSafeLhsTarget::SafeKeyedRead(ast),
+        ) {
             TcbExpr::new(format!("({} as any)[{}]", receiver.p(), key.p()))
         } else {
-            let element_access =
-                TcbExpr::new(format!("{}![{}]", receiver.p(), key.p())).add_parse_span_info(ast.source_span);
+            let element_access = TcbExpr::new(format!("{}![{}]", receiver.p(), key.p()))
+                .add_parse_span_info(ast.source_span);
             TcbExpr::new(format!("({} as any)", element_access.p()))
         };
         node.add_parse_span_info(ast.source_span)
@@ -346,9 +358,13 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
             ast.receiver,
             AngularExpression::SafePropertyRead(_) | AngularExpression::SafeKeyedRead(_)
         ) {
-            self.convert_to_safe_call(VeSafeLhsTarget::Call(ast), &expr, &args)
+            self.convert_to_safe_call(VeSafeLhsTarget::Call, &expr, &args)
         } else {
-            TcbExpr::new(format!("{}({})", expr.p(), args.iter().map(TcbExpr::p).collect::<Vec<_>>().join(", ")))
+            TcbExpr::new(format!(
+                "{}({})",
+                expr.p(),
+                args.iter().map(TcbExpr::p).collect::<Vec<_>>().join(", ")
+            ))
         };
 
         node.add_parse_span_info(ast.source_span)
@@ -358,7 +374,8 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
     fn visit_safe_call(&self, ast: &'a SafeCall<'a>) -> TcbExpr {
         let args: Vec<TcbExpr> = ast.args.iter().map(|expr| self.translate(expr)).collect();
         let expr = self.translate(&ast.receiver).wrap_for_type_checker();
-        self.convert_to_safe_call(VeSafeLhsTarget::SafeCall(ast), &expr, &args).add_parse_span_info(ast.source_span)
+        self.convert_to_safe_call(VeSafeLhsTarget::SafeCall(ast), &expr, &args)
+            .add_parse_span_info(ast.source_span)
     }
 
     // expression.ts:331 visitTemplateLiteral
@@ -374,7 +391,11 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
 
             for i in 1..tail_index {
                 let expr = self.translate(&ast.expressions[i - 1]);
-                parts.push(format!("${{{}}}{}", expr.p(), Self::escape_template_literal(&ast.elements[i].text)));
+                parts.push(format!(
+                    "${{{}}}{}",
+                    expr.p(),
+                    Self::escape_template_literal(&ast.elements[i].text)
+                ));
             }
             let resolved_expression = self.translate(&ast.expressions[tail_index - 1]);
             parts.push(format!(
@@ -457,7 +478,12 @@ impl<'r, 'a> TcbExprTranslator<'r, 'a> {
     }
 
     // expression.ts:417 convertToSafeCall
-    fn convert_to_safe_call(&self, ast: VeSafeLhsTarget<'a>, expr_node: &TcbExpr, arg_nodes: &[TcbExpr]) -> TcbExpr {
+    fn convert_to_safe_call(
+        &self,
+        ast: VeSafeLhsTarget<'a>,
+        expr_node: &TcbExpr,
+        arg_nodes: &[TcbExpr],
+    ) -> TcbExpr {
         let expr = expr_node.p();
         let args = arg_nodes.iter().map(TcbExpr::p).collect::<Vec<_>>().join(", ");
 
@@ -561,7 +587,9 @@ fn key_token_before_colon(text: &[u8], value_start: usize) -> Option<SpanInfo> {
         }
     } else {
         let mut j = end;
-        while j > 0 && (text[j - 1].is_ascii_alphanumeric() || text[j - 1] == b'_' || text[j - 1] == b'$') {
+        while j > 0
+            && (text[j - 1].is_ascii_alphanumeric() || text[j - 1] == b'_' || text[j - 1] == b'$')
+        {
             j -= 1;
         }
         if j == end {
@@ -569,14 +597,18 @@ fn key_token_before_colon(text: &[u8], value_start: usize) -> Option<SpanInfo> {
         }
         j
     };
-    Some(SpanInfo { start: start as u32, end: end as u32 })
+    Some(SpanInfo {
+        start: u32::try_from(start).expect("an offset"),
+        end: u32::try_from(end).expect("an offset"),
+    })
 }
 
 /// The nodes `VeSafeLhsInferenceBugDetector.veWillInferAnyFor` takes: `Call | SafeCall | SafePropertyRead |
 /// SafeKeyedRead`
 #[derive(Clone, Copy)]
 enum VeSafeLhsTarget<'a> {
-    Call(&'a Call<'a>),
+    /// (`veWillInferAnyFor` only needs to know it is a `Call`)
+    Call,
     SafeCall(&'a SafeCall<'a>),
     SafePropertyRead(&'a SafePropertyRead<'a>),
     SafeKeyedRead(&'a SafeKeyedRead<'a>),
@@ -590,7 +622,7 @@ impl VeSafeLhsInferenceBugDetector {
     fn ve_will_infer_any_for(ast: VeSafeLhsTarget<'_>) -> bool {
         match ast {
             // `ast.visit(visitor)`: `visitCall`
-            VeSafeLhsTarget::Call(_) => true,
+            VeSafeLhsTarget::Call => true,
             VeSafeLhsTarget::SafeCall(ast) => Self::visit(&ast.receiver),
             VeSafeLhsTarget::SafePropertyRead(ast) => Self::visit(&ast.receiver),
             VeSafeLhsTarget::SafeKeyedRead(ast) => Self::visit(&ast.receiver),
@@ -603,35 +635,247 @@ impl VeSafeLhsInferenceBugDetector {
         match ast {
             E::Unary(ast) => Self::visit(&ast.expr),
             E::Binary(ast) => Self::visit(&ast.left) || Self::visit(&ast.right),
-            E::Chain(_) => false,
             E::Conditional(ast) => {
-                Self::visit(&ast.condition) || Self::visit(&ast.true_exp) || Self::visit(&ast.false_exp)
+                Self::visit(&ast.condition)
+                    || Self::visit(&ast.true_exp)
+                    || Self::visit(&ast.false_exp)
             }
-            E::Call(_) => true,
-            E::SafeCall(_) => false,
-            E::ImplicitReceiver(_) => false,
-            E::ThisReceiver(_) => false,
             E::Interpolation(ast) => ast.expressions.iter().any(|exp| Self::visit(exp)),
-            E::KeyedRead(_) => false,
-            E::LiteralArray(_) => true,
-            E::LiteralMap(_) => true,
-            E::LiteralPrimitive(_) => false,
-            E::BindingPipe(_) => true,
+            // `visitCall`, `visitLiteralArray`, `visitLiteralMap`, `visitPipe`
+            E::Call(_) | E::LiteralArray(_) | E::LiteralMap(_) | E::BindingPipe(_) => true,
             E::PrefixNot(ast) => Self::visit(&ast.expression),
             E::TypeofExpression(ast) => Self::visit(&ast.expression),
             E::VoidExpression(ast) => Self::visit(&ast.expression),
             E::NonNullAssert(ast) => Self::visit(&ast.expression),
-            E::PropertyRead(_) => false,
-            E::SafePropertyRead(_) => false,
-            E::SafeKeyedRead(_) => false,
-            E::TemplateLiteral(_) => false,
-            E::TaggedTemplateLiteral(_) => false,
             E::ParenthesizedExpression(ast) => Self::visit(&ast.expression),
-            E::RegularExpressionLiteral(_) => false,
             E::SpreadElement(ast) => Self::visit(&ast.expression),
-            E::ArrowFunction(_) => false,
+            // `visitChain`, `visitSafeCall`, `visitImplicitReceiver`, `visitThisReceiver`, `visitKeyedRead`,
+            // `visitLiteralPrimitive`, `visitPropertyRead`, `visitSafePropertyRead`, `visitSafeKeyedRead`,
+            // `visitTemplateLiteral`, `visitTaggedTemplateLiteral`, `visitRegularExpressionLiteral`,
+            // `visitArrowFunction`
+            E::Chain(_)
+            | E::SafeCall(_)
+            | E::ImplicitReceiver(_)
+            | E::ThisReceiver(_)
+            | E::KeyedRead(_)
+            | E::LiteralPrimitive(_)
+            | E::PropertyRead(_)
+            | E::SafePropertyRead(_)
+            | E::SafeKeyedRead(_)
+            | E::TemplateLiteral(_)
+            | E::TaggedTemplateLiteral(_)
+            | E::RegularExpressionLiteral(_)
+            | E::ArrowFunction(_) => false,
             // The detector has no `visitEmptyExpr`: JavaScript throws calling the missing method.
             E::Empty(_) => panic!("visitor.visitEmptyExpr is not a function"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use oxc_allocator::Allocator;
+    use oxc_angular_compiler::ast::expression::AngularExpression;
+    use oxc_angular_compiler::parser::expression::{BindingParser, Parser};
+    use oxc_span::Span;
+
+    use super::{ast_to_tcb_expr, key_token_before_colon};
+    use crate::typecheck::api::{DiagnosticCategoryLabel, TypeCheckingConfig};
+    use crate::typecheck::ops::codegen::{SpanInfo, TcbExpr};
+
+    fn config(strict: bool) -> TypeCheckingConfig {
+        TypeCheckingConfig {
+            check_type_of_input_bindings: strict,
+            honor_access_modifiers_for_input_bindings: false,
+            strict_null_input_bindings: strict,
+            check_type_of_attributes: strict,
+            check_type_of_dom_bindings: false,
+            check_type_of_output_events: strict,
+            check_type_of_animation_events: strict,
+            check_type_of_dom_events: strict,
+            check_unclaimed_event_names: false,
+            check_type_of_dom_references: strict,
+            check_type_of_non_dom_references: true,
+            enable_template_type_checker: false,
+            check_type_of_pipes: true,
+            apply_template_context_guards: strict,
+            strict_safe_navigation_types: strict,
+            check_template_bodies: true,
+            always_check_schema_in_template_bodies: true,
+            control_flow_preventing_content_projection: DiagnosticCategoryLabel::Warning,
+            unused_standalone_imports: DiagnosticCategoryLabel::Warning,
+            use_context_generic_type: strict,
+            strict_literal_types: true,
+            use_inline_type_constructors: true,
+            allow_signals_in_two_way_bindings: true,
+            allow_dom_event_assertion: true,
+            check_control_flow_bodies: true,
+            check_unknown_elements: false,
+        }
+    }
+
+    /// The base translator's resolution with no template entities: the receivers are the component (`this`).
+    fn resolve_receivers(ast: &AngularExpression<'_>) -> Option<TcbExpr> {
+        matches!(ast, AngularExpression::ImplicitReceiver(_) | AngularExpression::ThisReceiver(_))
+            .then(|| TcbExpr::new("this"))
+    }
+
+    fn translate_with(source: &str, action: bool, config: &TypeCheckingConfig) -> String {
+        let allocator = Allocator::default();
+        let source = allocator.alloc_str(source);
+        let parser = Parser::new(&allocator, source);
+        let result = if action { parser.parse_action() } else { parser.parse_simple_binding() };
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let ast = allocator.alloc(result.ast);
+        ast_to_tcb_expr(ast, &resolve_receivers, config).p()
+    }
+
+    fn translate(source: &str) -> String {
+        translate_with(source, false, &config(true))
+    }
+
+    /// The text without span comments, as Angular's tests print it (through the TypeScript printer, which drops
+    /// them).
+    fn strip_comments(text: &str) -> String {
+        let mut out = String::new();
+        let mut rest = text;
+        while let Some(start) = rest.find(" /*") {
+            out.push_str(&rest[..start]);
+            let end = rest[start..].find("*/").expect("a closed comment");
+            rest = &rest[start + end + 2..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    #[test]
+    fn span_comments() {
+        assert_eq!(translate("a"), "((this).a /*0,1*/) /*0,1*/");
+        assert_eq!(
+            translate("a + b"),
+            "(((this).a /*0,1*/) /*0,1*/) + (((this).b /*4,5*/) /*4,5*/) /*0,5*/"
+        );
+        assert_eq!(translate("-1"), "(-1 /*1,2*/) /*0,2*/");
+    }
+
+    fn translate_interpolation(source: &str) -> String {
+        let allocator = Allocator::default();
+        let parser = BindingParser::new(&allocator);
+        let source = allocator.alloc_str(source);
+        let span = Span::new(0, u32::try_from(source.len()).unwrap());
+        let result = parser.parse_default_interpolation(source, span).expect("an interpolation");
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let ast = allocator.alloc(result.ast);
+        ast_to_tcb_expr(ast, &resolve_receivers, &config(true)).p()
+    }
+
+    // The expectations below are those of Angular's `type_check_block_spec.ts` (`{{expression}}` in a template,
+    // whose block text it prints without comments, and checks with `toContain`).
+    #[test]
+    fn expressions_as_angular_prints_them() {
+        let cases = [
+            ("a!", "((((this).a))!)"),
+            ("-1", "(-1)"),
+            ("a[b]", "(((this).a))[((this).b)]"),
+            ("a ?? b", "((((this).a)) ?? (((this).b)))"),
+            ("typeof a", "typeof (((this).a))"),
+            ("!(typeof a)", "!((typeof (((this).a))))"),
+            ("void a", "void (((this).a))"),
+            ("!(void a === \"object\")", "!(((void (((this).a))) === (\"object\")))"),
+            ("a ** b ** c", "((((this).a)) ** (((((this).b)) ** (((this).c)))))"),
+            ("`hello world`", "`hello world`"),
+            ("`hello ${name}!!!`", "`hello ${((this).name)}!!!`"),
+            ("`a${`hello ${name}`}b`", "`a${`hello ${((this).name)}`}b`"),
+            ("tag`hello world`", "((this).tag)`hello world`"),
+            ("`a\\`b`", "`a\\`b`"),
+            ("`a\\${b}`", "`a$\\{b}`"),
+            ("`a\\\\b`", "`a\\\\b`"),
+            (
+                "method({foo: a, bar: b})",
+                "(this).method(({ \"foo\": ((this).a), \"bar\": ((this).b) }))",
+            ),
+            ("method([a, b])", "(this).method([((this).a), ((this).b)])"),
+            ("/\\d+/g.test(\"123\")", "((/\\d+/g)).test(\"123\")"),
+        ];
+        for (source, expected) in cases {
+            let text = strip_comments(&translate_interpolation(&format!("{{{{{source}}}}}")));
+            assert!(text.contains(expected), "{source}: {text}");
+        }
+    }
+
+    #[test]
+    fn assignments_in_actions() {
+        // Without a bound target, an assignment is not resolved: it translates as a binary expression.
+        for operator in ["=", "+=", "-=", "*=", "/=", "%=", "**=", "&&=", "||=", "??="] {
+            let source = format!("a {operator} b");
+            assert_eq!(
+                strip_comments(&translate_with(&source, true, &config(true))),
+                format!("(((this).a)) {operator} (((this).b))"),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn interpolation() {
+        let text = translate_interpolation("{{hello}} {{world}}");
+        assert_eq!(strip_comments(&text), "\"\" + (((this).hello)) + (((this).world))");
+    }
+
+    #[test]
+    fn safe_navigation() {
+        assert_eq!(strip_comments(&translate("a?.b")), "(((this).a))?.b");
+        assert_eq!(strip_comments(&translate("a?.b.c")), "(((this).a))?.b.c");
+        assert_eq!(strip_comments(&translate("a?.[0]")), "(((this).a))?.[0]");
+        assert_eq!(strip_comments(&translate("a?.b()")), "(((this).a))?.b?.()");
+        let loose = config(false);
+        assert_eq!(
+            strip_comments(&translate_with("a?.b", false, &loose)),
+            "((((this).a))!.b as any)"
+        );
+        assert_eq!(
+            strip_comments(&translate_with("a()?.b", false, &loose)),
+            "(((this).a()) as any).b"
+        );
+        assert_eq!(
+            strip_comments(&translate_with("a?.[0]", false, &loose)),
+            "((((this).a))![0] as any)"
+        );
+    }
+
+    #[test]
+    fn literals() {
+        assert_eq!(strip_comments(&translate("1e21")), "1e+21");
+        assert_eq!(strip_comments(&translate("0.5")), "0.5");
+        assert_eq!(strip_comments(&translate("'a\"b'")), "\"a\\\"b\"");
+        assert_eq!(strip_comments(&translate("null")), "null");
+        assert_eq!(strip_comments(&translate("undefined")), "undefined");
+        assert_eq!(strip_comments(&translate_with("[1]", false, &config(false))), "[1]");
+        let mut loose_literals = config(true);
+        loose_literals.strict_literal_types = false;
+        assert_eq!(strip_comments(&translate_with("[1]", false, &loose_literals)), "([1] as any)");
+        assert_eq!(
+            strip_comments(&translate_with("{a: 1}", false, &loose_literals)),
+            "({ \"a\": 1 } as any)"
+        );
+    }
+
+    #[test]
+    fn arrow_functions() {
+        assert_eq!(strip_comments(&translate("(x) => x + a")), "x => (x) + (((this).a))");
+        assert_eq!(strip_comments(&translate("(x, y) => x")), "(x, y) => x");
+    }
+
+    #[test]
+    fn literal_map_key_spans_come_from_the_text() {
+        let source = "{ \"foo\": a, bar :b, c }";
+        let text = crate::span::with_source_text(source, || translate(source));
+        assert!(text.contains("\"foo\" /*2,7*/: "), "{text}");
+        assert!(text.contains("\"bar\" /*12,15*/: "), "{text}");
+        assert!(text.contains("\"c\" /*20,21*/: "), "{text}");
+        assert_eq!(
+            key_token_before_colon(b"{'a\\'b' : 1}", 10),
+            Some(SpanInfo { start: 1, end: 7 })
+        );
     }
 }

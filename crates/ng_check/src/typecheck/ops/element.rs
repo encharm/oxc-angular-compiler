@@ -41,8 +41,10 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbElementOp<'a, 'b> {
 
         // Add the declaration of the element using document.createElement.
         let initializer =
-            TcbExpr::new(format!("document.createElement(\"{}\")", self.element.name)).add_parse_span_info(span);
-        let stmt = TcbExpr::new(format!("var {} = {}", id_node.p(), initializer.p())).add_parse_span_info(span);
+            TcbExpr::new(format!("document.createElement(\"{}\")", self.element.name))
+                .add_parse_span_info(span);
+        let stmt = TcbExpr::new(format!("var {} = {}", id_node.p(), initializer.p()))
+            .add_parse_span_info(span);
         self.scope.add_statement(stmt);
         Some(id_node)
     }

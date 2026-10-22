@@ -1,7 +1,8 @@
 //! `packages/compiler/src/typecheck/ops/references.ts`
 
 use oxc_angular_compiler::ast::r3::{
-    R3Component, R3Directive, R3Element, R3HostElement, R3LetDeclaration, R3Reference, R3Template, R3Variable,
+    R3Component, R3Directive, R3Element, R3HostElement, R3LetDeclaration, R3Reference, R3Template,
+    R3Variable,
 };
 
 use crate::angular::t2_api::{DirectiveOwner, TemplateEntity, node_key};
@@ -83,6 +84,7 @@ pub enum ReferenceOpTarget<'a> {
 
 // references.ts:56 TcbReferenceOp
 /// A `TcbOp` which creates a variable for a local ref in a template.
+///
 /// The initializer for the variable is the variable expression for the directive, template, or
 /// element the ref refers to. When the reference is used in the template, those TCB statements will
 /// access this variable as well. For example:
@@ -134,15 +136,22 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbReferenceOp<'a, 'b> {
     fn execute(&self) -> Option<TcbExpr> {
         let id = TcbExpr::new(self.tcb.allocate_id());
         let mut initializer = match &self.target {
-            ReferenceOpTarget::Template(target) => self.scope.resolve(LocalSymbol::Template(target), None),
-            ReferenceOpTarget::Element(target) => self.scope.resolve(LocalSymbol::Element(target), None),
-            ReferenceOpTarget::Directive(target) => self.scope.resolve(self.host.into(), Some(target)),
+            ReferenceOpTarget::Template(target) => {
+                self.scope.resolve(LocalSymbol::Template(target), None)
+            }
+            ReferenceOpTarget::Element(target) => {
+                self.scope.resolve(LocalSymbol::Element(target), None)
+            }
+            ReferenceOpTarget::Directive(target) => {
+                self.scope.resolve(self.host.into(), Some(target))
+            }
         };
 
         let config = self.tcb.env.config();
         // The reference is either to an element, an <ng-template> node, or to a directive on an
         // element or template.
-        if (matches!(self.target, ReferenceOpTarget::Element(_)) && !config.check_type_of_dom_references)
+        if (matches!(self.target, ReferenceOpTarget::Element(_))
+            && !config.check_type_of_dom_references)
             || !config.check_type_of_non_dom_references
         {
             // References to DOM nodes are pinned to 'any' when `checkTypeOfDomReferences` is `false`.
@@ -153,8 +162,10 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbReferenceOp<'a, 'b> {
             // Direct references to an <ng-template> node simply require a value of type
             // `TemplateRef<any>`. To get this, an expression of the form
             // `(_t1 as any as TemplateRef<any>)` is constructed.
-            let template_ref = self.tcb.env.reference_external_symbol("@angular/core", "TemplateRef");
-            initializer = TcbExpr::new(format!("({} as any as {}<any>)", initializer.p(), template_ref.p()));
+            let template_ref =
+                self.tcb.env.reference_external_symbol("@angular/core", "TemplateRef");
+            initializer =
+                TcbExpr::new(format!("({} as any as {}<any>)", initializer.p(), template_ref.p()));
         }
         let initializer = initializer.add_parse_span_info(self.node.source_span);
         let id = id.add_parse_span_info(self.node.key_span);
@@ -165,7 +176,9 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbReferenceOp<'a, 'b> {
 }
 
 // references.ts:108 TcbInvalidReferenceOp
-/// A `TcbOp` which is used when the target of a reference is missing. This operation generates a
+/// A `TcbOp` which is used when the target of a reference is missing.
+///
+/// This operation generates a
 /// variable of type any for usages of the invalid reference to resolve to. The invalid reference
 /// itself is recorded out-of-band.
 pub struct TcbInvalidReferenceOp<'a, 'b> {

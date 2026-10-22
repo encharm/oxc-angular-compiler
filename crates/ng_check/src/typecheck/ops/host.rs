@@ -17,7 +17,11 @@ pub struct TcbHostElementOp<'a, 'b> {
 
 impl<'a, 'b> TcbHostElementOp<'a, 'b> {
     // host.ts:23 constructor
-    pub fn new(tcb: TcbRef<'a, 'b>, scope: ScopeRef<'a, 'b>, element: &'a R3HostElement<'a>) -> Self {
+    pub fn new(
+        tcb: TcbRef<'a, 'b>,
+        scope: ScopeRef<'a, 'b>,
+        element: &'a R3HostElement<'a>,
+    ) -> Self {
         Self { tcb, scope, element }
     }
 }
@@ -37,7 +41,12 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbHostElementOp<'a, 'b> {
         } else {
             format!(
                 "null! as {}",
-                self.element.tag_names.iter().map(|t| format!("\"{t}\"")).collect::<Vec<_>>().join(" | ")
+                self.element
+                    .tag_names
+                    .iter()
+                    .map(|t| format!("\"{t}\""))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
             )
         };
 

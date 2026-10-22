@@ -113,19 +113,22 @@ impl<'a, 'b> TcbTemplateBodyOp<'a, 'b> {
             // any template guards, and generate them if needed.
             for guard in &dir.ng_template_guards {
                 // For each template guard function on the directive, look for a binding to that input.
-                let bound_input =
-                    host_node.inputs().iter().find(|i| i.name == guard.input_name.as_str()).or_else(|| {
-                        match host_node {
-                            GuardHost::Template(template) if is_template => {
-                                template.template_attrs.iter().find_map(|input| match input {
-                                    R3TemplateAttr::Bound(input) if input.name == guard.input_name.as_str() => {
-                                        Some(input)
-                                    }
-                                    _ => None,
-                                })
-                            }
-                            _ => None,
+                let bound_input = host_node
+                    .inputs()
+                    .iter()
+                    .find(|i| i.name == guard.input_name.as_str())
+                    .or_else(|| match host_node {
+                        GuardHost::Template(template) if is_template => {
+                            template.template_attrs.iter().find_map(|input| match input {
+                                R3TemplateAttr::Bound(input)
+                                    if input.name == guard.input_name.as_str() =>
+                                {
+                                    Some(input)
+                                }
+                                _ => None,
+                            })
                         }
+                        _ => None,
                     });
                 if let Some(bound_input) = bound_input {
                     // If there is such a binding, generate an expression for it.
@@ -149,7 +152,8 @@ impl<'a, 'b> TcbTemplateBodyOp<'a, 'b> {
                             expr.p()
                         ));
 
-                        let guard_invoke = guard_invoke.add_parse_span_info(bound_input.value.source_span());
+                        let guard_invoke =
+                            guard_invoke.add_parse_span_info(bound_input.value.source_span());
                         guards.push(guard_invoke);
                     }
                 }
@@ -157,7 +161,9 @@ impl<'a, 'b> TcbTemplateBodyOp<'a, 'b> {
 
             // The second kind of guard is a template context guard. This guard narrows the template
             // rendering context variable `ctx`.
-            if dir.has_ng_template_context_guard && self.tcb.env.config().apply_template_context_guards {
+            if dir.has_ng_template_context_guard
+                && self.tcb.env.config().apply_template_context_guards
+            {
                 let ctx = self.scope.resolve(host_node.as_local_symbol(), None);
                 let guard_invoke = TcbExpr::new(format!(
                     "{}.ngTemplateContextGuard({}, {})",
@@ -214,11 +220,9 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbTemplateBodyOp<'a, 'b> {
         if let Some(last) = directive_guards.pop() {
             // Pop the first value and use it as the initializer to reduce(). This way, a single guard
             // will be used on its own, but two or more will be combined into binary AND expressions.
-            guard = Some(
-                directive_guards
-                    .into_iter()
-                    .fold(last, |expr, dir_guard| TcbExpr::new(format!("{} && {}", expr.p(), dir_guard.p()))),
-            );
+            guard = Some(directive_guards.into_iter().fold(last, |expr, dir_guard| {
+                TcbExpr::new(format!("{} && {}", expr.p(), dir_guard.p()))
+            }));
         }
 
         // Create a new Scope for the template. This constructs the list of operations for the template

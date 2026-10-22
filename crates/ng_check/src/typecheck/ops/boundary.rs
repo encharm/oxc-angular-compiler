@@ -1,5 +1,6 @@
-//! `packages/compiler/src/typecheck/ops/boundary.ts`: `TcbBoundaryOp`, which renders a `@boundary` block, is not
-//! ported: the fork's template AST has no `BoundaryBlock` (or `BoundaryErrorBlock`), its parser does not produce one,
+//! `packages/compiler/src/typecheck/ops/boundary.ts`: not ported.
+//!
+//! `TcbBoundaryOp`, which renders a `@boundary` block, is not ported: the fork's template AST has no `BoundaryBlock` (or `BoundaryErrorBlock`), its parser does not produce one,
 //! and `Scope` never creates the op (`scope.rs` notes where it would).
 //!
 //! For when the fork gains the nodes, the TypeScript (boundary.ts:19-101), whose text is:

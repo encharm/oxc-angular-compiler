@@ -63,7 +63,8 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDomSchemaCheckerOp<'a, 'b> {
     // schema.ts:42 execute
     fn execute(&self) -> Option<TcbExpr> {
         let element = self.element;
-        let is_template_element = matches!(element, DirectiveOwner::Element(_) | DirectiveOwner::Component(_));
+        let is_template_element =
+            matches!(element, DirectiveOwner::Element(_) | DirectiveOwner::Component(_));
         let bindings: &'a [R3BoundAttribute<'a>] = match element {
             DirectiveOwner::Element(node) => &node.inputs,
             DirectiveOwner::Component(node) => &node.inputs,
@@ -90,11 +91,14 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDomSchemaCheckerOp<'a, 'b> {
 
         // TODO(alxhub): this could be more efficient.
         for binding in bindings {
-            let is_property_binding =
-                binding.binding_type == BindingType::Property || binding.binding_type == BindingType::TwoWay;
+            let is_property_binding = binding.binding_type == BindingType::Property
+                || binding.binding_type == BindingType::TwoWay;
 
             if is_property_binding
-                && self.claimed_inputs.as_ref().is_some_and(|claimed| claimed.contains(binding.name.as_str()))
+                && self
+                    .claimed_inputs
+                    .as_ref()
+                    .is_some_and(|claimed| claimed.contains(binding.name.as_str()))
             {
                 // Skip this binding as it was claimed by a directive.
                 continue;
@@ -102,7 +106,8 @@ impl<'a, 'b> TcbOp<'a, 'b> for TcbDomSchemaCheckerOp<'a, 'b> {
 
             if is_property_binding && binding.name != "style" && binding.name != "class" {
                 // A direct binding to a property.
-                let property_name = REGISTRY.with(|registry| registry.get_mapped_prop_name(&binding.name));
+                let property_name =
+                    REGISTRY.with(|registry| registry.get_mapped_prop_name(&binding.name));
 
                 if is_template_element {
                     self.tcb.dom_schema_checker.check_template_element_property(
