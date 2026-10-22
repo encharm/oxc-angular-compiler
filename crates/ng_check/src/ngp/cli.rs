@@ -150,7 +150,24 @@ fn run(args: &Args) -> Result<usize, String> {
         .output()
         .map_err(|e| format!("{}: {e}", tsrs.display()))?;
     let text = String::from_utf8_lossy(&output.stdout).into_owned() + &String::from_utf8_lossy(&output.stderr);
-    for d in parse_tsc_output(&text) {
+    let found = parse_tsc_output(&text);
+    // tsc's statuses: 0 clean, 1 or 2 with diagnostics; anything else (or 1 or 2 with none to read) is the checker
+    // failing, which must not pass as a clean check
+    let checked = match output.status.code() {
+        Some(0) => true,
+        Some(1 | 2) => !found.is_empty(),
+        _ => false,
+    };
+    if !checked {
+        let tail: Vec<&str> = text.lines().rev().take(12).collect();
+        return Err(format!(
+            "{} failed ({}):\n{}",
+            tsrs.display(),
+            output.status,
+            tail.into_iter().rev().collect::<Vec<_>>().join("\n")
+        ));
+    }
+    for d in found {
         let Some((tcb_path, component, file)) =
             sources_by_tcb.iter().find(|(tcb_path, ..)| d.file.as_deref() == Some(tcb_path.as_path()))
         else {
