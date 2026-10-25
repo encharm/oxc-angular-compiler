@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "baseUrl": ".",
+    "paths": {
+      "@angular/core": ["angular/core/index.d.ts"],
+      "@angular/common": ["angular/common/index.d.ts"]
+    }
+  },
+  "angularCompilerOptions": { "strictTemplates": true },
+  "include": ["src/**/*.ts"]
+}

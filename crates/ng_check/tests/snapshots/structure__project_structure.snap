@@ -1,0 +1,1120 @@
+---
+source: crates/ng_check/tests/structure.rs
+expression: structure()
+---
+{
+  "version": 1,
+  "components": [
+    {
+      "file": "<fixture>/src/child.ts",
+      "className": "Child",
+      "classPosition": {
+        "start": 148,
+        "end": 208,
+        "line": 4,
+        "column": 8
+      },
+      "selector": "x-child, x-kid",
+      "selectors": [
+        {
+          "element": "x-child",
+          "attrs": [],
+          "classes": [],
+          "not": []
+        },
+        {
+          "element": "x-kid",
+          "attrs": [],
+          "classes": [],
+          "not": []
+        }
+      ],
+      "standalone": true,
+      "templateFile": "<fixture>/src/child.html",
+      "inlineTemplate": false,
+      "imports": [],
+      "inputs": [
+        {
+          "property": "label",
+          "bindingName": "label",
+          "required": true
+        }
+      ],
+      "outputs": [],
+      "host": [],
+      "members": [
+        {
+          "name": "label",
+          "kind": "field",
+          "static": false,
+          "initializer": "input.required",
+          "decorators": []
+        }
+      ],
+      "template": {
+        "version": 1,
+        "nodes": [
+          {
+            "type": "element",
+            "id": 0,
+            "position": {
+              "start": 0,
+              "end": 40,
+              "line": 1,
+              "column": 1
+            },
+            "name": "span",
+            "attrs": [
+              {
+                "name": "title",
+                "value": "Child",
+                "position": {
+                  "start": 6,
+                  "end": 19,
+                  "line": 1,
+                  "column": 7
+                }
+              }
+            ],
+            "inputs": [],
+            "outputs": [],
+            "refs": [],
+            "selfClosing": false,
+            "matches": [],
+            "children": [
+              {
+                "type": "boundText",
+                "position": {
+                  "start": 20,
+                  "end": 33,
+                  "line": 1,
+                  "column": 21
+                },
+                "expr": {
+                  "source": "{{ label() }}",
+                  "position": {
+                    "start": 20,
+                    "end": 33,
+                    "line": 1,
+                    "column": 21
+                  },
+                  "kind": "interpolation",
+                  "strings": [
+                    "",
+                    ""
+                  ],
+                  "exprs": [
+                    {
+                      "source": "label()",
+                      "position": {
+                        "start": 23,
+                        "end": 30,
+                        "line": 1,
+                        "column": 24
+                      },
+                      "kind": "call",
+                      "callee": {
+                        "source": "label",
+                        "position": {
+                          "start": 23,
+                          "end": 28,
+                          "line": 1,
+                          "column": 24
+                        },
+                        "kind": "read",
+                        "name": "label",
+                        "safe": false
+                      },
+                      "args": [],
+                      "safe": false
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "file": "<fixture>/src/panel.ts",
+      "className": "Panel",
+      "classPosition": {
+        "start": 1021,
+        "end": 1508,
+        "line": 27,
+        "column": 8
+      },
+      "selector": "x-panel",
+      "selectors": [
+        {
+          "element": "x-panel",
+          "attrs": [],
+          "classes": [],
+          "not": []
+        }
+      ],
+      "standalone": true,
+      "templateFile": "<fixture>/src/panel.ts",
+      "inlineTemplate": true,
+      "imports": [
+        "Child",
+        "Hint",
+        "NgIf",
+        "NgTemplateOutlet"
+      ],
+      "inputs": [
+        {
+          "property": "size",
+          "bindingName": "size",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "property": "changed",
+          "bindingName": "changed",
+          "required": false
+        }
+      ],
+      "host": [
+        {
+          "kind": "property",
+          "name": "attr.data-hint",
+          "source": "variant"
+        },
+        {
+          "kind": "attribute",
+          "name": "role",
+          "source": "region"
+        },
+        {
+          "kind": "listener",
+          "name": "keydown",
+          "source": "onKey($event)"
+        },
+        {
+          "kind": "property",
+          "name": "class.active",
+          "source": "active"
+        },
+        {
+          "kind": "listener",
+          "name": "click",
+          "source": "onClick($event)"
+        }
+      ],
+      "members": [
+        {
+          "name": "videoControls",
+          "kind": "getter",
+          "static": false,
+          "doc": "Playback controls of the open video overlay.",
+          "decorators": []
+        },
+        {
+          "name": "model3dControls",
+          "kind": "field",
+          "static": false,
+          "doc": "Viewer controls of the open 3D overlay.",
+          "decorators": []
+        },
+        {
+          "name": "open",
+          "kind": "field",
+          "static": false,
+          "decorators": []
+        },
+        {
+          "name": "rows",
+          "kind": "field",
+          "static": false,
+          "decorators": []
+        },
+        {
+          "name": "size",
+          "kind": "field",
+          "static": false,
+          "initializer": "input",
+          "decorators": []
+        },
+        {
+          "name": "changed",
+          "kind": "field",
+          "static": false,
+          "initializer": "output",
+          "decorators": []
+        },
+        {
+          "name": "variant",
+          "kind": "field",
+          "static": false,
+          "initializer": "computed",
+          "decorators": []
+        },
+        {
+          "name": "active",
+          "kind": "field",
+          "static": false,
+          "decorators": [
+            "HostBinding"
+          ]
+        },
+        {
+          "name": "onClick",
+          "kind": "method",
+          "static": false,
+          "decorators": [
+            "HostListener"
+          ]
+        },
+        {
+          "name": "onKey",
+          "kind": "method",
+          "static": false,
+          "decorators": []
+        },
+        {
+          "name": "select",
+          "kind": "method",
+          "static": false,
+          "decorators": []
+        }
+      ],
+      "template": {
+        "version": 1,
+        "nodes": [
+          {
+            "type": "template",
+            "id": 0,
+            "position": {
+              "start": 431,
+              "end": 507,
+              "line": 12,
+              "column": 5
+            },
+            "tag": "ng-template",
+            "attrs": [],
+            "inputs": [],
+            "outputs": [],
+            "refs": [
+              {
+                "name": "menu",
+                "value": "",
+                "target": {
+                  "kind": "template",
+                  "node": 0
+                }
+              }
+            ],
+            "templateAttrs": [],
+            "vars": [
+              {
+                "name": "item",
+                "value": ""
+              }
+            ],
+            "matches": [],
+            "children": [
+              {
+                "type": "element",
+                "id": 1,
+                "position": {
+                  "start": 459,
+                  "end": 493,
+                  "line": 12,
+                  "column": 33
+                },
+                "name": "a",
+                "attrs": [
+                  {
+                    "name": "data-hint",
+                    "value": "pick",
+                    "position": {
+                      "start": 462,
+                      "end": 478,
+                      "line": 12,
+                      "column": 36
+                    },
+                    "consumer": {
+                      "directive": "Hint",
+                      "property": "name"
+                    }
+                  }
+                ],
+                "inputs": [],
+                "outputs": [],
+                "refs": [],
+                "selfClosing": false,
+                "matches": [
+                  {
+                    "name": "Hint",
+                    "selector": "[data-hint], [data-hint-value]",
+                    "component": false,
+                    "reference": "./hint#Hint"
+                  }
+                ],
+                "children": [
+                  {
+                    "type": "boundText",
+                    "position": {
+                      "start": 479,
+                      "end": 489,
+                      "line": 12,
+                      "column": 53
+                    },
+                    "expr": {
+                      "source": "{{ item }}",
+                      "position": {
+                        "start": 479,
+                        "end": 489,
+                        "line": 12,
+                        "column": 53
+                      },
+                      "kind": "interpolation",
+                      "strings": [
+                        "",
+                        ""
+                      ],
+                      "exprs": [
+                        {
+                          "source": "item",
+                          "position": {
+                            "start": 482,
+                            "end": 486,
+                            "line": 12,
+                            "column": 56
+                          },
+                          "kind": "read",
+                          "name": "item",
+                          "safe": false,
+                          "target": {
+                            "kind": "variable",
+                            "node": 0
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "if",
+            "id": 2,
+            "position": {
+              "start": 512,
+              "end": 733,
+              "line": 13,
+              "column": 5
+            },
+            "branches": [
+              {
+                "id": 3,
+                "position": {
+                  "start": 512,
+                  "end": 621,
+                  "line": 13,
+                  "column": 5
+                },
+                "condition": {
+                  "source": "videoControls",
+                  "position": {
+                    "start": 517,
+                    "end": 530,
+                    "line": 13,
+                    "column": 10
+                  },
+                  "kind": "read",
+                  "name": "videoControls",
+                  "safe": false
+                },
+                "alias": "vc",
+                "children": [
+                  {
+                    "type": "element",
+                    "id": 4,
+                    "position": {
+                      "start": 547,
+                      "end": 615,
+                      "line": 14,
+                      "column": 7
+                    },
+                    "name": "x-child",
+                    "attrs": [
+                      {
+                        "name": "data-hint",
+                        "value": "mute",
+                        "position": {
+                          "start": 569,
+                          "end": 585,
+                          "line": 14,
+                          "column": 29
+                        },
+                        "consumer": {
+                          "directive": "Hint",
+                          "property": "name"
+                        }
+                      }
+                    ],
+                    "inputs": [
+                      {
+                        "name": "label",
+                        "binding": "property",
+                        "expr": {
+                          "source": "vc",
+                          "position": {
+                            "start": 565,
+                            "end": 567,
+                            "line": 14,
+                            "column": 25
+                          },
+                          "kind": "read",
+                          "name": "vc",
+                          "safe": false,
+                          "target": {
+                            "kind": "variable",
+                            "node": 3
+                          }
+                        },
+                        "position": {
+                          "start": 556,
+                          "end": 568,
+                          "line": 14,
+                          "column": 16
+                        },
+                        "consumer": {
+                          "directive": "Child",
+                          "property": "label"
+                        }
+                      },
+                      {
+                        "name": "data-hint-value",
+                        "binding": "property",
+                        "expr": {
+                          "source": "size()",
+                          "position": {
+                            "start": 605,
+                            "end": 611,
+                            "line": 14,
+                            "column": 65
+                          },
+                          "kind": "call",
+                          "callee": {
+                            "source": "size",
+                            "position": {
+                              "start": 605,
+                              "end": 609,
+                              "line": 14,
+                              "column": 65
+                            },
+                            "kind": "read",
+                            "name": "size",
+                            "safe": false
+                          },
+                          "args": [],
+                          "safe": false
+                        },
+                        "position": {
+                          "start": 586,
+                          "end": 612,
+                          "line": 14,
+                          "column": 46
+                        },
+                        "consumer": {
+                          "directive": "Hint",
+                          "property": "value"
+                        }
+                      }
+                    ],
+                    "outputs": [],
+                    "refs": [],
+                    "selfClosing": true,
+                    "matches": [
+                      {
+                        "name": "Child",
+                        "selector": "x-child, x-kid",
+                        "component": true,
+                        "reference": "./child#Child"
+                      },
+                      {
+                        "name": "Hint",
+                        "selector": "[data-hint], [data-hint-value]",
+                        "component": false,
+                        "reference": "./hint#Hint"
+                      }
+                    ],
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "position": {
+                  "start": 622,
+                  "end": 733,
+                  "line": 15,
+                  "column": 7
+                },
+                "condition": {
+                  "source": "model3dControls",
+                  "position": {
+                    "start": 632,
+                    "end": 647,
+                    "line": 15,
+                    "column": 17
+                  },
+                  "kind": "read",
+                  "name": "model3dControls",
+                  "safe": false
+                },
+                "children": [
+                  {
+                    "type": "template",
+                    "id": 6,
+                    "position": {
+                      "start": 657,
+                      "end": 727,
+                      "line": 16,
+                      "column": 7
+                    },
+                    "tag": "ng-container",
+                    "attrs": [],
+                    "inputs": [],
+                    "outputs": [],
+                    "refs": [],
+                    "templateAttrs": [
+                      {
+                        "name": "ngTemplateOutlet",
+                        "expr": {
+                          "source": "menu",
+                          "position": {
+                            "start": 690,
+                            "end": 694,
+                            "line": 16,
+                            "column": 40
+                          },
+                          "kind": "read",
+                          "name": "menu",
+                          "safe": false,
+                          "target": {
+                            "kind": "reference",
+                            "node": 0
+                          }
+                        },
+                        "consumer": {
+                          "directive": "NgTemplateOutlet",
+                          "property": "ngTemplateOutlet"
+                        }
+                      },
+                      {
+                        "name": "ngTemplateOutletContext",
+                        "expr": {
+                          "source": "{ $implicit: 'é' }",
+                          "position": {
+                            "start": 705,
+                            "end": 723,
+                            "line": 16,
+                            "column": 55
+                          },
+                          "kind": "object",
+                          "entries": [
+                            {
+                              "key": "$implicit",
+                              "value": {
+                                "source": "'é'",
+                                "position": {
+                                  "start": 718,
+                                  "end": 721,
+                                  "line": 16,
+                                  "column": 68
+                                },
+                                "kind": "literal",
+                                "value": "é"
+                              }
+                            }
+                          ]
+                        },
+                        "consumer": {
+                          "directive": "NgTemplateOutlet",
+                          "property": "ngTemplateOutletContext"
+                        }
+                      }
+                    ],
+                    "vars": [],
+                    "matches": [
+                      {
+                        "name": "NgTemplateOutlet",
+                        "selector": "[ngTemplateOutlet]",
+                        "component": false,
+                        "reference": "@angular/common#NgTemplateOutlet"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "type": "element",
+                        "id": 7,
+                        "position": {
+                          "start": 657,
+                          "end": 727,
+                          "line": 16,
+                          "column": 7
+                        },
+                        "name": "ng-container",
+                        "attrs": [],
+                        "inputs": [],
+                        "outputs": [],
+                        "refs": [],
+                        "selfClosing": true,
+                        "matches": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "template",
+            "id": 8,
+            "position": {
+              "start": 738,
+              "end": 775,
+              "line": 18,
+              "column": 5
+            },
+            "tag": "p",
+            "attrs": [],
+            "inputs": [],
+            "outputs": [],
+            "refs": [],
+            "templateAttrs": [
+              {
+                "name": "ngIf",
+                "expr": {
+                  "source": "open",
+                  "position": {
+                    "start": 748,
+                    "end": 752,
+                    "line": 18,
+                    "column": 15
+                  },
+                  "kind": "read",
+                  "name": "open",
+                  "safe": false
+                },
+                "consumer": {
+                  "directive": "NgIf",
+                  "property": "ngIf"
+                }
+              },
+              {
+                "name": "ngIfElse",
+                "expr": {
+                  "source": "closed",
+                  "position": {
+                    "start": 759,
+                    "end": 765,
+                    "line": 18,
+                    "column": 26
+                  },
+                  "kind": "read",
+                  "name": "closed",
+                  "safe": false,
+                  "target": {
+                    "kind": "reference",
+                    "node": 11
+                  }
+                },
+                "consumer": {
+                  "directive": "NgIf",
+                  "property": "ngIfElse"
+                }
+              }
+            ],
+            "vars": [],
+            "matches": [
+              {
+                "name": "NgIf",
+                "selector": "[ngIf]",
+                "component": false,
+                "reference": "@angular/common#NgIf"
+              }
+            ],
+            "children": [
+              {
+                "type": "element",
+                "id": 9,
+                "position": {
+                  "start": 738,
+                  "end": 775,
+                  "line": 18,
+                  "column": 5
+                },
+                "name": "p",
+                "attrs": [],
+                "inputs": [],
+                "outputs": [],
+                "refs": [],
+                "selfClosing": false,
+                "matches": [],
+                "children": [
+                  {
+                    "type": "text",
+                    "position": {
+                      "start": 767,
+                      "end": 771,
+                      "line": 18,
+                      "column": 34
+                    },
+                    "value": "open"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "id": 10,
+            "position": {
+              "start": 780,
+              "end": 797,
+              "line": 19,
+              "column": 5
+            },
+            "name": "i",
+            "attrs": [],
+            "inputs": [],
+            "outputs": [],
+            "refs": [
+              {
+                "name": "note",
+                "value": "",
+                "target": {
+                  "kind": "element",
+                  "node": 10
+                }
+              }
+            ],
+            "selfClosing": false,
+            "matches": [],
+            "children": [
+              {
+                "type": "text",
+                "position": {
+                  "start": 789,
+                  "end": 793,
+                  "line": 19,
+                  "column": 14
+                },
+                "value": "note"
+              }
+            ]
+          },
+          {
+            "type": "template",
+            "id": 11,
+            "position": {
+              "start": 802,
+              "end": 861,
+              "line": 20,
+              "column": 5
+            },
+            "tag": "ng-template",
+            "attrs": [],
+            "inputs": [],
+            "outputs": [],
+            "refs": [
+              {
+                "name": "closed",
+                "value": "",
+                "target": {
+                  "kind": "template",
+                  "node": 11
+                }
+              }
+            ],
+            "templateAttrs": [],
+            "vars": [],
+            "matches": [],
+            "children": [
+              {
+                "type": "element",
+                "id": 12,
+                "position": {
+                  "start": 823,
+                  "end": 847,
+                  "line": 20,
+                  "column": 26
+                },
+                "name": "x-kid",
+                "attrs": [
+                  {
+                    "name": "label",
+                    "value": "closed",
+                    "position": {
+                      "start": 830,
+                      "end": 844,
+                      "line": 20,
+                      "column": 33
+                    },
+                    "consumer": {
+                      "directive": "Child",
+                      "property": "label"
+                    }
+                  }
+                ],
+                "inputs": [],
+                "outputs": [],
+                "refs": [],
+                "selfClosing": true,
+                "matches": [
+                  {
+                    "name": "Child",
+                    "selector": "x-child, x-kid",
+                    "component": true,
+                    "reference": "./child#Child"
+                  }
+                ],
+                "children": []
+              }
+            ]
+          },
+          {
+            "type": "for",
+            "id": 13,
+            "position": {
+              "start": 866,
+              "end": 975,
+              "line": 21,
+              "column": 5
+            },
+            "expr": {
+              "source": "rows",
+              "position": {
+                "start": 879,
+                "end": 883,
+                "line": 21,
+                "column": 18
+              },
+              "kind": "read",
+              "name": "rows",
+              "safe": false
+            },
+            "item": "row",
+            "track": {
+              "source": "row",
+              "position": {
+                "start": 891,
+                "end": 894,
+                "line": 21,
+                "column": 30
+              },
+              "kind": "read",
+              "name": "row",
+              "safe": false,
+              "target": {
+                "kind": "variable",
+                "node": 13
+              }
+            },
+            "contextVars": [
+              {
+                "name": "$index",
+                "value": "$index"
+              },
+              {
+                "name": "$first",
+                "value": "$first"
+              },
+              {
+                "name": "$last",
+                "value": "$last"
+              },
+              {
+                "name": "$even",
+                "value": "$even"
+              },
+              {
+                "name": "$odd",
+                "value": "$odd"
+              },
+              {
+                "name": "$count",
+                "value": "$count"
+              },
+              {
+                "name": "i",
+                "value": "$index"
+              }
+            ],
+            "children": [
+              {
+                "type": "element",
+                "id": 14,
+                "position": {
+                  "start": 920,
+                  "end": 969,
+                  "line": 22,
+                  "column": 7
+                },
+                "name": "b",
+                "attrs": [],
+                "inputs": [],
+                "outputs": [
+                  {
+                    "name": "click",
+                    "handler": {
+                      "source": "select(i)",
+                      "position": {
+                        "start": 932,
+                        "end": 941,
+                        "line": 22,
+                        "column": 19
+                      },
+                      "kind": "call",
+                      "callee": {
+                        "source": "select",
+                        "position": {
+                          "start": 932,
+                          "end": 938,
+                          "line": 22,
+                          "column": 19
+                        },
+                        "kind": "read",
+                        "name": "select",
+                        "safe": false
+                      },
+                      "args": [
+                        {
+                          "source": "i",
+                          "position": {
+                            "start": 939,
+                            "end": 940,
+                            "line": 22,
+                            "column": 26
+                          },
+                          "kind": "read",
+                          "name": "i",
+                          "safe": false,
+                          "target": {
+                            "kind": "variable",
+                            "node": 13
+                          }
+                        }
+                      ],
+                      "safe": false
+                    },
+                    "position": {
+                      "start": 923,
+                      "end": 942,
+                      "line": 22,
+                      "column": 10
+                    }
+                  }
+                ],
+                "refs": [],
+                "selfClosing": false,
+                "matches": [],
+                "children": [
+                  {
+                    "type": "boundText",
+                    "position": {
+                      "start": 943,
+                      "end": 965,
+                      "line": 22,
+                      "column": 30
+                    },
+                    "expr": {
+                      "source": "{{ note.textContent }}",
+                      "position": {
+                        "start": 943,
+                        "end": 965,
+                        "line": 22,
+                        "column": 30
+                      },
+                      "kind": "interpolation",
+                      "strings": [
+                        "",
+                        ""
+                      ],
+                      "exprs": [
+                        {
+                          "source": "note.textContent",
+                          "position": {
+                            "start": 946,
+                            "end": 962,
+                            "line": 22,
+                            "column": 33
+                          },
+                          "kind": "read",
+                          "name": "textContent",
+                          "receiver": {
+                            "source": "note",
+                            "position": {
+                              "start": 946,
+                              "end": 950,
+                              "line": 22,
+                              "column": 33
+                            },
+                            "kind": "read",
+                            "name": "note",
+                            "safe": false,
+                            "target": {
+                              "kind": "reference",
+                              "node": 10
+                            }
+                          },
+                          "safe": false
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "let",
+            "id": 15,
+            "position": {
+              "start": 980,
+              "end": 1005,
+              "line": 24,
+              "column": 5
+            },
+            "name": "total",
+            "expr": {
+              "source": "rows.length",
+              "position": {
+                "start": 993,
+                "end": 1004,
+                "line": 24,
+                "column": 18
+              },
+              "kind": "read",
+              "name": "length",
+              "receiver": {
+                "source": "rows",
+                "position": {
+                  "start": 993,
+                  "end": 997,
+                  "line": 24,
+                  "column": 18
+                },
+                "kind": "read",
+                "name": "rows",
+                "safe": false
+              },
+              "safe": false
+            }
+          }
+        ],
+        "errors": []
+      }
+    }
+  ]
+}

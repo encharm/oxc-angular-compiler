@@ -1,7 +1,7 @@
 //! The `ngcheck` command line (not a port): type-checks a project's Angular templates.
 //!
 //!   ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep]
-//!   ngcheck -p <tsconfig.json> --structure <file|->
+//!   ngcheck -p <tsconfig.json> --structure <file|-> [--include <dir>]...
 //!
 //! 1. ng-analyze analyzes the project (the tsconfig's files and what they import).
 //! 2. Each file with components gets its type-check file (`processor`), written to a sibling of the source root,
@@ -13,7 +13,8 @@
 //!    <message>`, paths relative to the working directory.
 //!
 //! `--structure` writes the components' templates as JSON instead, to the file or to stdout (`structure`): it type-checks
-//! nothing and runs no tsrs.
+//! nothing and runs no tsrs. With `--include`, only the components of files under those directories are written (the
+//! analysis still reads the whole project, which binding needs).
 //!
 //! Exit status: 0 with no errors, 1 with errors, 2 when it could not run.
 
@@ -81,11 +82,13 @@ struct Args {
     out: Option<PathBuf>,
     /// Where the components' templates go as JSON (`-`: stdout), in place of the check
     structure: Option<PathBuf>,
+    /// With `structure`: the directories whose files' components are written; all when empty
+    include: Vec<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
-    let (mut tsconfig, mut tsrs, mut keep, mut out, mut structure) = (None, None, false, None, None);
+    let (mut tsconfig, mut tsrs, mut keep, mut out, mut structure, mut include) = (None, None, false, None, None, vec![]);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-p" | "--project" => tsconfig = args.next().map(PathBuf::from),
@@ -93,12 +96,13 @@ fn parse_args() -> Result<Args, String> {
             "--keep" => keep = true,
             "--out" => out = args.next().map(PathBuf::from),
             "--structure" => structure = Some(args.next().map(PathBuf::from).ok_or("missing --structure <file|->")?),
+            "--include" => include.push(args.next().map(PathBuf::from).ok_or("missing --include <dir>")?),
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument: {other}")),
         }
     }
     let tsconfig = tsconfig.ok_or("missing -p <tsconfig.json>")?;
-    Ok(Args { tsconfig, tsrs, keep, out, structure })
+    Ok(Args { tsconfig, tsrs, keep, out, structure, include })
 }
 
 pub fn main() -> i32 {
@@ -109,12 +113,12 @@ pub fn main() -> i32 {
                 eprintln!("ngcheck: {message}");
             }
             eprintln!("usage: ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep] [--out <dir>]");
-            eprintln!("       ngcheck -p <tsconfig.json> --structure <file|->");
+            eprintln!("       ngcheck -p <tsconfig.json> --structure <file|-> [--include <dir>]...");
             return 2;
         }
     };
     if let Some(structure) = &args.structure {
-        return match write_structure(&args.tsconfig, structure) {
+        return match write_structure(&args.tsconfig, structure, &args.include) {
             Ok(()) => 0,
             Err(message) => {
                 eprintln!("ngcheck: {message}");
@@ -262,14 +266,26 @@ fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, St
     })
 }
 
-/// The components' templates as JSON (`structure`): `{ "components": [...] }`, to `out` or to stdout for `-`
-fn write_structure(tsconfig: &Path, out: &Path) -> Result<(), String> {
+/// The components' templates as JSON (`structure`), to `out` or to stdout for `-`; only the files under `include`, when
+/// it names any directory
+fn write_structure(tsconfig: &Path, out: &Path, include: &[PathBuf]) -> Result<(), String> {
     let tsconfig = std::fs::canonicalize(tsconfig).map_err(|e| format!("{}: {e}", tsconfig.display()))?;
+    let include = include
+        .iter()
+        .map(|dir| std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display())))
+        .collect::<Result<Vec<_>, _>>()?;
     let files = for_each_file(&tsconfig, |ctx, result| {
+        if !include.is_empty() && !include.iter().any(|dir| Path::new(&result.file_path).starts_with(dir)) {
+            return Ok(vec![]);
+        }
         let content = ctx.analyzer.get_file_content_sync(&result.file_path)?;
         Ok(file_structure(ctx, &result.file_path, &content, result))
     })?;
-    let json = serde_json::json!({ "components": files.into_iter().flatten().collect::<Vec<_>>() }).to_string();
+    let structure = oxc_angular_structure::schema::ProjectStructure {
+        version: oxc_angular_structure::SCHEMA_VERSION,
+        components: files.into_iter().flatten().collect(),
+    };
+    let json = serde_json::to_string(&structure).map_err(|e| e.to_string())?;
     if out == Path::new("-") {
         use std::io::Write;
         std::io::stdout().write_all(json.as_bytes()).map_err(|e| e.to_string())
