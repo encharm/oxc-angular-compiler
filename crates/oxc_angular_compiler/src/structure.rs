@@ -37,15 +37,16 @@ use crate::transform::HtmlToR3Transform;
 use crate::transform::html_to_r3::TransformOptions as R3TransformOptions;
 
 /// An element or a template, as handed to an annotation hook.
-pub enum AnnotatedNode<'n, 'a> {
+#[derive(Clone, Copy)]
+pub enum AnnotatedNode<'a> {
     /// An element.
-    Element(&'n R3Element<'a>),
+    Element(&'a R3Element<'a>),
     /// An `<ng-template>` or a structural directive's template.
-    Template(&'n R3Template<'a>),
+    Template(&'a R3Template<'a>),
 }
 
 /// Adds a field to an element or a template: its name and value, or nothing.
-pub type Annotate<'h, 'a> = dyn Fn(AnnotatedNode<'_, 'a>) -> Option<(&'static str, Value)> + 'h;
+pub type Annotate<'h, 'a> = dyn Fn(AnnotatedNode<'a>) -> Option<(&'static str, Value)> + 'h;
 
 /// Serializes R3 nodes over the template source they were parsed from.
 pub struct StructureWriter<'s, 'h, 'a> {
@@ -87,11 +88,11 @@ impl<'s, 'h, 'a> StructureWriter<'s, 'h, 'a> {
     }
 
     /// The nodes as a JSON array.
-    pub fn nodes(&self, nodes: &[R3Node<'a>]) -> Value {
+    pub fn nodes(&self, nodes: &'a [R3Node<'a>]) -> Value {
         Value::Array(nodes.iter().filter_map(|node| self.node(node)).collect())
     }
 
-    fn node(&self, node: &R3Node<'a>) -> Option<Value> {
+    fn node(&self, node: &'a R3Node<'a>) -> Option<Value> {
         let value = match node {
             R3Node::Comment(_)
             | R3Node::Variable(_)
@@ -230,13 +231,13 @@ impl<'s, 'h, 'a> StructureWriter<'s, 'h, 'a> {
         Some(Value::Object(value))
     }
 
-    fn defer_part(&self, span: Span, children: &[R3Node<'a>]) -> Map<String, Value> {
+    fn defer_part(&self, span: Span, children: &'a [R3Node<'a>]) -> Map<String, Value> {
         let mut n = self.located("defer", span);
         n.insert("children".into(), self.nodes(children));
         n
     }
 
-    fn element(&self, e: &R3Element<'a>) -> Map<String, Value> {
+    fn element(&self, e: &'a R3Element<'a>) -> Map<String, Value> {
         let mut n = self.located("element", e.source_span);
         n.insert("name".into(), json!(e.name.as_str()));
         n.insert("attrs".into(), Self::attrs(&e.attributes));
@@ -251,7 +252,7 @@ impl<'s, 'h, 'a> StructureWriter<'s, 'h, 'a> {
         n
     }
 
-    fn template(&self, t: &R3Template<'a>) -> Map<String, Value> {
+    fn template(&self, t: &'a R3Template<'a>) -> Map<String, Value> {
         let mut n = self.located("template", t.source_span);
         n.insert("tag".into(), t.tag_name.as_ref().map_or(Value::Null, |tag| json!(tag.as_str())));
         n.insert("attrs".into(), Self::attrs(&t.attributes));
@@ -365,7 +366,9 @@ pub fn parse_template_structure(template: &str, file_path: &str) -> Value {
             r3.errors.iter().map(|e| error(&e.msg, e.span.start.offset)).collect();
         return json!({ "nodes": [], "errors": errors });
     }
-    json!({ "nodes": writer.nodes(&r3.nodes), "errors": [] })
+    // the nodes live as long as the allocator, as the annotation hook's references do
+    let nodes = allocator.alloc(r3.nodes);
+    json!({ "nodes": writer.nodes(nodes), "errors": [] })
 }
 
 #[cfg(test)]
