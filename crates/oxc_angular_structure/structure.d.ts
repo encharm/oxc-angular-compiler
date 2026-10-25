@@ -54,7 +54,7 @@ export type HostBindingKind = "property" | "listener" | "attribute";
 
 export type ClassMember = { name: string, kind: MemberKind, static: boolean, 
 /**
- * The JSDoc written right before it, without its `/** */` and leading `*`s
+ * The JSDoc written right before it: its text, without the comment's delimiters and each line's leading asterisk
  */
 doc?: string, 
 /**
