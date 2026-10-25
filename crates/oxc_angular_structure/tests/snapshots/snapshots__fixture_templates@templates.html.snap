@@ -1,0 +1,336 @@
+---
+source: crates/oxc_angular_structure/tests/snapshots.rs
+expression: "parse_template(&template, \"fixture.html\", WriteOptions::default())"
+input_file: crates/oxc_angular_structure/tests/fixtures/templates.html
+---
+{
+  "version": 1,
+  "nodes": [
+    {
+      "type": "template",
+      "id": 0,
+      "position": {
+        "start": 0,
+        "end": 101,
+        "line": 1,
+        "column": 1
+      },
+      "tag": "ng-template",
+      "attrs": [],
+      "inputs": [],
+      "outputs": [],
+      "refs": [
+        {
+          "name": "menu",
+          "value": ""
+        }
+      ],
+      "templateAttrs": [],
+      "vars": [
+        {
+          "name": "item",
+          "value": ""
+        },
+        {
+          "name": "active",
+          "value": "isActive"
+        }
+      ],
+      "children": [
+        {
+          "type": "element",
+          "id": 1,
+          "position": {
+            "start": 53,
+            "end": 86,
+            "line": 2,
+            "column": 3
+          },
+          "name": "a",
+          "attrs": [
+            {
+              "name": "command",
+              "value": "paste",
+              "position": {
+                "start": 56,
+                "end": 71,
+                "line": 2,
+                "column": 6
+              }
+            }
+          ],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "boundText",
+              "position": {
+                "start": 72,
+                "end": 82,
+                "line": 2,
+                "column": 22
+              },
+              "expr": {
+                "source": "{{ item }}",
+                "position": {
+                  "start": 72,
+                  "end": 82,
+                  "line": 2,
+                  "column": 22
+                },
+                "kind": "interpolation",
+                "strings": [
+                  "",
+                  ""
+                ],
+                "exprs": [
+                  {
+                    "source": "item",
+                    "position": {
+                      "start": 75,
+                      "end": 79,
+                      "line": 2,
+                      "column": 25
+                    },
+                    "kind": "read",
+                    "name": "item",
+                    "safe": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "template",
+      "id": 2,
+      "position": {
+        "start": 102,
+        "end": 203,
+        "line": 4,
+        "column": 1
+      },
+      "tag": "ng-container",
+      "attrs": [],
+      "inputs": [],
+      "outputs": [],
+      "refs": [],
+      "templateAttrs": [
+        {
+          "name": "ngTemplateOutlet",
+          "expr": {
+            "source": "menu",
+            "position": {
+              "start": 135,
+              "end": 139,
+              "line": 4,
+              "column": 34
+            },
+            "kind": "read",
+            "name": "menu",
+            "safe": false
+          }
+        },
+        {
+          "name": "ngTemplateOutletContext",
+          "expr": {
+            "source": "{ $implicit: first, isActive: true }",
+            "position": {
+              "start": 150,
+              "end": 186,
+              "line": 4,
+              "column": 49
+            },
+            "kind": "object",
+            "entries": [
+              {
+                "key": "$implicit",
+                "value": {
+                  "source": "first",
+                  "position": {
+                    "start": 163,
+                    "end": 168,
+                    "line": 4,
+                    "column": 62
+                  },
+                  "kind": "read",
+                  "name": "first",
+                  "safe": false
+                }
+              },
+              {
+                "key": "isActive",
+                "value": {
+                  "source": "true",
+                  "position": {
+                    "start": 180,
+                    "end": 184,
+                    "line": 4,
+                    "column": 79
+                  },
+                  "kind": "literal",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "vars": [],
+      "children": [
+        {
+          "type": "element",
+          "id": 3,
+          "position": {
+            "start": 102,
+            "end": 203,
+            "line": 4,
+            "column": 1
+          },
+          "name": "ng-container",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": []
+        }
+      ]
+    },
+    {
+      "type": "template",
+      "id": 4,
+      "position": {
+        "start": 204,
+        "end": 246,
+        "line": 5,
+        "column": 1
+      },
+      "tag": "div",
+      "attrs": [],
+      "inputs": [],
+      "outputs": [],
+      "refs": [],
+      "templateAttrs": [
+        {
+          "name": "ngIf",
+          "expr": {
+            "source": "isHost",
+            "position": {
+              "start": 216,
+              "end": 222,
+              "line": 5,
+              "column": 13
+            },
+            "kind": "read",
+            "name": "isHost",
+            "safe": false
+          }
+        },
+        {
+          "name": "ngIfElse",
+          "expr": {
+            "source": "guest",
+            "position": {
+              "start": 229,
+              "end": 234,
+              "line": 5,
+              "column": 26
+            },
+            "kind": "read",
+            "name": "guest",
+            "safe": false
+          }
+        }
+      ],
+      "vars": [],
+      "children": [
+        {
+          "type": "element",
+          "id": 5,
+          "position": {
+            "start": 204,
+            "end": 246,
+            "line": 5,
+            "column": 1
+          },
+          "name": "div",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "text",
+              "position": {
+                "start": 236,
+                "end": 240,
+                "line": 5,
+                "column": 33
+              },
+              "value": "host"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "template",
+      "id": 6,
+      "position": {
+        "start": 247,
+        "end": 299,
+        "line": 6,
+        "column": 1
+      },
+      "tag": "ng-template",
+      "attrs": [],
+      "inputs": [],
+      "outputs": [],
+      "refs": [
+        {
+          "name": "guest",
+          "value": ""
+        }
+      ],
+      "templateAttrs": [],
+      "vars": [],
+      "children": [
+        {
+          "type": "element",
+          "id": 7,
+          "position": {
+            "start": 267,
+            "end": 285,
+            "line": 6,
+            "column": 21
+          },
+          "name": "span",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "text",
+              "position": {
+                "start": 273,
+                "end": 278,
+                "line": 6,
+                "column": 27
+              },
+              "value": "guest"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

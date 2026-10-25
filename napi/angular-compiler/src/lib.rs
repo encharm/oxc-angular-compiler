@@ -875,16 +875,18 @@ pub fn encapsulate_style(css: String, component_id: String) -> String {
     rust_encapsulate_style(&css, &component_id)
 }
 
-/// A template's structure as JSON text: `{ nodes, errors }`, the R3 tree with each expression's source text, parsed as
-/// the compiler parses it (node shapes in `oxc_angular_compiler::structure`).
+/// A template's structure as JSON text, a `TemplateStructure` of `oxc_angular_structure` (declared for TypeScript in
+/// its `structure.d.ts`): the R3 tree with every expression as a tree and as its source text.
 ///
 /// # Arguments
 ///
 /// * `template` - The template source
 /// * `file_path` - The template's path, for messages
+/// * `whitespace_text` - Write whitespace-only text nodes too (default: no)
 #[napi]
-pub fn parse_template_structure_sync(template: String, file_path: String) -> String {
-    oxc_angular_compiler::structure::parse_template_structure(&template, &file_path).to_string()
+pub fn parse_template_structure_sync(template: String, file_path: String, whitespace_text: Option<bool>) -> String {
+    let options = oxc_angular_structure::WriteOptions { whitespace_text: whitespace_text.unwrap_or(false) };
+    serde_json::to_string(&oxc_angular_structure::parse_template(&template, &file_path, options)).unwrap_or_default()
 }
 
 /// URLs extracted from @Component decorators in a file.

@@ -1,0 +1,10 @@
+<x-a
+  [a]="user?.profile?.name ?? 'anon'"
+  [b]="list[0]?.[key]"
+  [c]="open ? 'yes' : (count > 1 && !hidden)"
+  [d]="{ id: 1, 'quoted': true, ...rest }"
+  [e]="[1, -2, null, undefined, `t${x}`]"
+  [f]="fn?.(a, b)!"
+  [g]="typeof v === 'string'"
+  (h)="a = 1; save()"
+/>

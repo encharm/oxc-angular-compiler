@@ -1,0 +1,386 @@
+---
+source: crates/oxc_angular_structure/tests/snapshots.rs
+expression: "parse_template(&template, \"fixture.html\", WriteOptions::default())"
+input_file: crates/oxc_angular_structure/tests/fixtures/elements.html
+---
+{
+  "version": 1,
+  "nodes": [
+    {
+      "type": "element",
+      "id": 0,
+      "position": {
+        "start": 0,
+        "end": 139,
+        "line": 1,
+        "column": 1
+      },
+      "name": "button",
+      "attrs": [
+        {
+          "name": "command",
+          "value": "copy",
+          "position": {
+            "start": 8,
+            "end": 22,
+            "line": 1,
+            "column": 9
+          }
+        },
+        {
+          "name": "class",
+          "value": "btn",
+          "position": {
+            "start": 23,
+            "end": 34,
+            "line": 1,
+            "column": 24
+          }
+        }
+      ],
+      "inputs": [
+        {
+          "name": "data-hint-value",
+          "binding": "attribute",
+          "expr": {
+            "source": "tool.size",
+            "position": {
+              "start": 59,
+              "end": 68,
+              "line": 1,
+              "column": 60
+            },
+            "kind": "read",
+            "name": "size",
+            "receiver": {
+              "source": "tool",
+              "position": {
+                "start": 59,
+                "end": 63,
+                "line": 1,
+                "column": 60
+              },
+              "kind": "read",
+              "name": "tool",
+              "safe": false
+            },
+            "safe": false
+          },
+          "position": {
+            "start": 35,
+            "end": 69,
+            "line": 1,
+            "column": 36
+          }
+        },
+        {
+          "name": "disabled",
+          "binding": "property",
+          "expr": {
+            "source": "!canCopy()",
+            "position": {
+              "start": 82,
+              "end": 92,
+              "line": 1,
+              "column": 83
+            },
+            "kind": "not",
+            "operand": {
+              "source": "canCopy()",
+              "position": {
+                "start": 83,
+                "end": 92,
+                "line": 1,
+                "column": 84
+              },
+              "kind": "call",
+              "callee": {
+                "source": "canCopy",
+                "position": {
+                  "start": 83,
+                  "end": 90,
+                  "line": 1,
+                  "column": 84
+                },
+                "kind": "read",
+                "name": "canCopy",
+                "safe": false
+              },
+              "args": [],
+              "safe": false
+            }
+          },
+          "position": {
+            "start": 70,
+            "end": 93,
+            "line": 1,
+            "column": 71
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "click",
+          "handler": {
+            "source": "copy($event)",
+            "position": {
+              "start": 103,
+              "end": 115,
+              "line": 1,
+              "column": 104
+            },
+            "kind": "call",
+            "callee": {
+              "source": "copy",
+              "position": {
+                "start": 103,
+                "end": 107,
+                "line": 1,
+                "column": 104
+              },
+              "kind": "read",
+              "name": "copy",
+              "safe": false
+            },
+            "args": [
+              {
+                "source": "$event",
+                "position": {
+                  "start": 108,
+                  "end": 114,
+                  "line": 1,
+                  "column": 109
+                },
+                "kind": "read",
+                "name": "$event",
+                "safe": false
+              }
+            ],
+            "safe": false
+          },
+          "position": {
+            "start": 94,
+            "end": 116,
+            "line": 1,
+            "column": 95
+          }
+        }
+      ],
+      "refs": [
+        {
+          "name": "btn",
+          "value": ""
+        }
+      ],
+      "selfClosing": false,
+      "children": [
+        {
+          "type": "text",
+          "position": {
+            "start": 122,
+            "end": 130,
+            "line": 1,
+            "column": 123
+          },
+          "value": "\n  Copy\n"
+        }
+      ]
+    },
+    {
+      "type": "element",
+      "id": 1,
+      "position": {
+        "start": 140,
+        "end": 219,
+        "line": 4,
+        "column": 1
+      },
+      "name": "input",
+      "attrs": [],
+      "inputs": [
+        {
+          "name": "ngModel",
+          "binding": "twoWay",
+          "expr": {
+            "source": "name",
+            "position": {
+              "start": 160,
+              "end": 164,
+              "line": 4,
+              "column": 21
+            },
+            "kind": "read",
+            "name": "name",
+            "safe": false
+          },
+          "position": {
+            "start": 147,
+            "end": 165,
+            "line": 4,
+            "column": 8
+          }
+        },
+        {
+          "name": "active",
+          "binding": "class",
+          "expr": {
+            "source": "isActive",
+            "position": {
+              "start": 182,
+              "end": 190,
+              "line": 4,
+              "column": 43
+            },
+            "kind": "read",
+            "name": "isActive",
+            "safe": false
+          },
+          "position": {
+            "start": 166,
+            "end": 191,
+            "line": 4,
+            "column": 27
+          }
+        },
+        {
+          "name": "width",
+          "binding": "style",
+          "expr": {
+            "source": "width",
+            "position": {
+              "start": 210,
+              "end": 215,
+              "line": 4,
+              "column": 71
+            },
+            "kind": "read",
+            "name": "width",
+            "safe": false
+          },
+          "position": {
+            "start": 192,
+            "end": 216,
+            "line": 4,
+            "column": 53
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ngModelChange",
+          "handler": {
+            "source": "name",
+            "position": {
+              "start": 160,
+              "end": 164,
+              "line": 4,
+              "column": 21
+            },
+            "kind": "read",
+            "name": "name",
+            "safe": false
+          },
+          "position": {
+            "start": 147,
+            "end": 165,
+            "line": 4,
+            "column": 8
+          }
+        }
+      ],
+      "refs": [],
+      "selfClosing": true,
+      "children": []
+    },
+    {
+      "type": "element",
+      "id": 2,
+      "position": {
+        "start": 220,
+        "end": 284,
+        "line": 5,
+        "column": 1
+      },
+      "name": "p",
+      "attrs": [],
+      "inputs": [],
+      "outputs": [],
+      "refs": [],
+      "selfClosing": false,
+      "children": [
+        {
+          "type": "boundText",
+          "position": {
+            "start": 223,
+            "end": 280,
+            "line": 5,
+            "column": 4
+          },
+          "expr": {
+            "source": "Don't worry — it's fine: {{ count | number:'1.0-0' }} é😀",
+            "position": {
+              "start": 223,
+              "end": 280,
+              "line": 5,
+              "column": 4
+            },
+            "kind": "interpolation",
+            "strings": [
+              "Don't worry — it's fine: ",
+              " é😀"
+            ],
+            "exprs": [
+              {
+                "source": "count | number:'1.0-0'",
+                "position": {
+                  "start": 251,
+                  "end": 273,
+                  "line": 5,
+                  "column": 32
+                },
+                "kind": "pipe",
+                "name": "number",
+                "input": {
+                  "source": "count",
+                  "position": {
+                    "start": 251,
+                    "end": 256,
+                    "line": 5,
+                    "column": 32
+                  },
+                  "kind": "read",
+                  "name": "count",
+                  "safe": false
+                },
+                "args": [
+                  {
+                    "source": "'1.0-0'",
+                    "position": {
+                      "start": 266,
+                      "end": 273,
+                      "line": 5,
+                      "column": 47
+                    },
+                    "kind": "literal",
+                    "value": "1.0-0"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "content",
+      "position": {
+        "start": 285,
+        "end": 315,
+        "line": 6,
+        "column": 1
+      },
+      "selector": "[slot]"
+    }
+  ],
+  "errors": []
+}

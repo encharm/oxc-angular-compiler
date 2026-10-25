@@ -1,0 +1,19 @@
+@if (editor.selectedTool; as tool) {
+  <i>{{ tool.name }}</i>
+} @else if (videoControls && !model3dControls) {
+  <b>video</b>
+} @else {
+  <u>none</u>
+}
+@for (item of items(); track item.id; let i = $index, last = $last) {
+  <li [class.last]="last">{{ i }}: {{ item.label }}</li>
+} @empty {
+  <li>empty</li>
+}
+@switch (mode) {
+  @case ('brush') { <span>brush</span> }
+  @case ('shape') @case ('pattern') { <span>presets</span> }
+  @default { <span>other</span> }
+}
+@defer (on viewport) { <big-chart /> } @placeholder { <span>…</span> } @loading { <span>loading</span> }
+@let total = a + b * 2;

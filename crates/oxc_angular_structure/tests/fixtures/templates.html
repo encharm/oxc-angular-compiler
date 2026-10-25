@@ -1,0 +1,6 @@
+<ng-template #menu let-item let-active="isActive">
+  <a command="paste">{{ item }}</a>
+</ng-template>
+<ng-container *ngTemplateOutlet="menu; context: { $implicit: first, isActive: true }"></ng-container>
+<div *ngIf="isHost; else guest">host</div>
+<ng-template #guest><span>guest</span></ng-template>

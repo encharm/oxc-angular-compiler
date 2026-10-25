@@ -1,0 +1,657 @@
+---
+source: crates/oxc_angular_structure/tests/snapshots.rs
+expression: "parse_template(&template, \"fixture.html\", WriteOptions::default())"
+input_file: crates/oxc_angular_structure/tests/fixtures/expressions.html
+---
+{
+  "version": 1,
+  "nodes": [
+    {
+      "type": "element",
+      "id": 0,
+      "position": {
+        "start": 0,
+        "end": 271,
+        "line": 1,
+        "column": 1
+      },
+      "name": "x-a",
+      "attrs": [],
+      "inputs": [
+        {
+          "name": "a",
+          "binding": "property",
+          "expr": {
+            "source": "user?.profile?.name ?? 'anon'",
+            "position": {
+              "start": 12,
+              "end": 41,
+              "line": 2,
+              "column": 8
+            },
+            "kind": "binary",
+            "operator": "??",
+            "left": {
+              "source": "user?.profile?.name",
+              "position": {
+                "start": 12,
+                "end": 31,
+                "line": 2,
+                "column": 8
+              },
+              "kind": "read",
+              "name": "name",
+              "receiver": {
+                "source": "user?.profile",
+                "position": {
+                  "start": 12,
+                  "end": 25,
+                  "line": 2,
+                  "column": 8
+                },
+                "kind": "read",
+                "name": "profile",
+                "receiver": {
+                  "source": "user",
+                  "position": {
+                    "start": 12,
+                    "end": 16,
+                    "line": 2,
+                    "column": 8
+                  },
+                  "kind": "read",
+                  "name": "user",
+                  "safe": false
+                },
+                "safe": true
+              },
+              "safe": true
+            },
+            "right": {
+              "source": "'anon'",
+              "position": {
+                "start": 35,
+                "end": 41,
+                "line": 2,
+                "column": 31
+              },
+              "kind": "literal",
+              "value": "anon"
+            }
+          },
+          "position": {
+            "start": 7,
+            "end": 42,
+            "line": 2,
+            "column": 3
+          }
+        },
+        {
+          "name": "b",
+          "binding": "property",
+          "expr": {
+            "source": "list[0]?.[key]",
+            "position": {
+              "start": 50,
+              "end": 64,
+              "line": 3,
+              "column": 8
+            },
+            "kind": "keyed",
+            "receiver": {
+              "source": "list[0]",
+              "position": {
+                "start": 50,
+                "end": 57,
+                "line": 3,
+                "column": 8
+              },
+              "kind": "keyed",
+              "receiver": {
+                "source": "list",
+                "position": {
+                  "start": 50,
+                  "end": 54,
+                  "line": 3,
+                  "column": 8
+                },
+                "kind": "read",
+                "name": "list",
+                "safe": false
+              },
+              "key": {
+                "source": "0",
+                "position": {
+                  "start": 55,
+                  "end": 56,
+                  "line": 3,
+                  "column": 13
+                },
+                "kind": "literal",
+                "value": 0.0
+              },
+              "safe": false
+            },
+            "key": {
+              "source": "key",
+              "position": {
+                "start": 60,
+                "end": 63,
+                "line": 3,
+                "column": 18
+              },
+              "kind": "read",
+              "name": "key",
+              "safe": false
+            },
+            "safe": true
+          },
+          "position": {
+            "start": 45,
+            "end": 65,
+            "line": 3,
+            "column": 3
+          }
+        },
+        {
+          "name": "c",
+          "binding": "property",
+          "expr": {
+            "source": "open ? 'yes' : (count > 1 && !hidden)",
+            "position": {
+              "start": 73,
+              "end": 110,
+              "line": 4,
+              "column": 8
+            },
+            "kind": "conditional",
+            "condition": {
+              "source": "open",
+              "position": {
+                "start": 73,
+                "end": 77,
+                "line": 4,
+                "column": 8
+              },
+              "kind": "read",
+              "name": "open",
+              "safe": false
+            },
+            "then": {
+              "source": "'yes'",
+              "position": {
+                "start": 80,
+                "end": 85,
+                "line": 4,
+                "column": 15
+              },
+              "kind": "literal",
+              "value": "yes"
+            },
+            "otherwise": {
+              "source": "(count > 1 && !hidden)",
+              "position": {
+                "start": 88,
+                "end": 110,
+                "line": 4,
+                "column": 23
+              },
+              "kind": "paren",
+              "operand": {
+                "source": "count > 1 && !hidden",
+                "position": {
+                  "start": 89,
+                  "end": 109,
+                  "line": 4,
+                  "column": 24
+                },
+                "kind": "binary",
+                "operator": "&&",
+                "left": {
+                  "source": "count > 1",
+                  "position": {
+                    "start": 89,
+                    "end": 98,
+                    "line": 4,
+                    "column": 24
+                  },
+                  "kind": "binary",
+                  "operator": ">",
+                  "left": {
+                    "source": "count",
+                    "position": {
+                      "start": 89,
+                      "end": 94,
+                      "line": 4,
+                      "column": 24
+                    },
+                    "kind": "read",
+                    "name": "count",
+                    "safe": false
+                  },
+                  "right": {
+                    "source": "1",
+                    "position": {
+                      "start": 97,
+                      "end": 98,
+                      "line": 4,
+                      "column": 32
+                    },
+                    "kind": "literal",
+                    "value": 1.0
+                  }
+                },
+                "right": {
+                  "source": "!hidden",
+                  "position": {
+                    "start": 102,
+                    "end": 109,
+                    "line": 4,
+                    "column": 37
+                  },
+                  "kind": "not",
+                  "operand": {
+                    "source": "hidden",
+                    "position": {
+                      "start": 103,
+                      "end": 109,
+                      "line": 4,
+                      "column": 38
+                    },
+                    "kind": "read",
+                    "name": "hidden",
+                    "safe": false
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "start": 68,
+            "end": 111,
+            "line": 4,
+            "column": 3
+          }
+        },
+        {
+          "name": "d",
+          "binding": "property",
+          "expr": {
+            "source": "{ id: 1, 'quoted': true, ...rest }",
+            "position": {
+              "start": 119,
+              "end": 153,
+              "line": 5,
+              "column": 8
+            },
+            "kind": "object",
+            "entries": [
+              {
+                "key": "id",
+                "value": {
+                  "source": "1",
+                  "position": {
+                    "start": 125,
+                    "end": 126,
+                    "line": 5,
+                    "column": 14
+                  },
+                  "kind": "literal",
+                  "value": 1.0
+                }
+              },
+              {
+                "key": "quoted",
+                "value": {
+                  "source": "true",
+                  "position": {
+                    "start": 138,
+                    "end": 142,
+                    "line": 5,
+                    "column": 27
+                  },
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "value": {
+                  "source": "rest",
+                  "position": {
+                    "start": 147,
+                    "end": 151,
+                    "line": 5,
+                    "column": 36
+                  },
+                  "kind": "read",
+                  "name": "rest",
+                  "safe": false
+                }
+              }
+            ]
+          },
+          "position": {
+            "start": 114,
+            "end": 154,
+            "line": 5,
+            "column": 3
+          }
+        },
+        {
+          "name": "e",
+          "binding": "property",
+          "expr": {
+            "source": "[1, -2, null, undefined, `t${x}`]",
+            "position": {
+              "start": 162,
+              "end": 195,
+              "line": 6,
+              "column": 8
+            },
+            "kind": "array",
+            "items": [
+              {
+                "source": "1",
+                "position": {
+                  "start": 163,
+                  "end": 164,
+                  "line": 6,
+                  "column": 9
+                },
+                "kind": "literal",
+                "value": 1.0
+              },
+              {
+                "source": "-2",
+                "position": {
+                  "start": 166,
+                  "end": 168,
+                  "line": 6,
+                  "column": 12
+                },
+                "kind": "unary",
+                "operator": "-",
+                "operand": {
+                  "source": "2",
+                  "position": {
+                    "start": 167,
+                    "end": 168,
+                    "line": 6,
+                    "column": 13
+                  },
+                  "kind": "literal",
+                  "value": 2.0
+                }
+              },
+              {
+                "source": "null",
+                "position": {
+                  "start": 170,
+                  "end": 174,
+                  "line": 6,
+                  "column": 16
+                },
+                "kind": "literal",
+                "value": null
+              },
+              {
+                "source": "undefined",
+                "position": {
+                  "start": 176,
+                  "end": 185,
+                  "line": 6,
+                  "column": 22
+                },
+                "kind": "literal",
+                "value": null,
+                "undefined": true
+              },
+              {
+                "source": "`t${x}`",
+                "position": {
+                  "start": 187,
+                  "end": 194,
+                  "line": 6,
+                  "column": 33
+                },
+                "kind": "templateLiteral",
+                "strings": [
+                  "t",
+                  ""
+                ],
+                "exprs": [
+                  {
+                    "source": "x",
+                    "position": {
+                      "start": 191,
+                      "end": 192,
+                      "line": 6,
+                      "column": 37
+                    },
+                    "kind": "read",
+                    "name": "x",
+                    "safe": false
+                  }
+                ]
+              }
+            ]
+          },
+          "position": {
+            "start": 157,
+            "end": 196,
+            "line": 6,
+            "column": 3
+          }
+        },
+        {
+          "name": "f",
+          "binding": "property",
+          "expr": {
+            "source": "fn?.(a, b)!",
+            "position": {
+              "start": 204,
+              "end": 215,
+              "line": 7,
+              "column": 8
+            },
+            "kind": "nonNull",
+            "operand": {
+              "source": "fn?.(a, b)",
+              "position": {
+                "start": 204,
+                "end": 214,
+                "line": 7,
+                "column": 8
+              },
+              "kind": "call",
+              "callee": {
+                "source": "fn",
+                "position": {
+                  "start": 204,
+                  "end": 206,
+                  "line": 7,
+                  "column": 8
+                },
+                "kind": "read",
+                "name": "fn",
+                "safe": false
+              },
+              "args": [
+                {
+                  "source": "a",
+                  "position": {
+                    "start": 209,
+                    "end": 210,
+                    "line": 7,
+                    "column": 13
+                  },
+                  "kind": "read",
+                  "name": "a",
+                  "safe": false
+                },
+                {
+                  "source": "b",
+                  "position": {
+                    "start": 212,
+                    "end": 213,
+                    "line": 7,
+                    "column": 16
+                  },
+                  "kind": "read",
+                  "name": "b",
+                  "safe": false
+                }
+              ],
+              "safe": true
+            }
+          },
+          "position": {
+            "start": 199,
+            "end": 216,
+            "line": 7,
+            "column": 3
+          }
+        },
+        {
+          "name": "g",
+          "binding": "property",
+          "expr": {
+            "source": "typeof v === 'string'",
+            "position": {
+              "start": 224,
+              "end": 245,
+              "line": 8,
+              "column": 8
+            },
+            "kind": "binary",
+            "operator": "===",
+            "left": {
+              "source": "typeof v",
+              "position": {
+                "start": 224,
+                "end": 232,
+                "line": 8,
+                "column": 8
+              },
+              "kind": "typeof",
+              "operand": {
+                "source": "v",
+                "position": {
+                  "start": 231,
+                  "end": 232,
+                  "line": 8,
+                  "column": 15
+                },
+                "kind": "read",
+                "name": "v",
+                "safe": false
+              }
+            },
+            "right": {
+              "source": "'string'",
+              "position": {
+                "start": 237,
+                "end": 245,
+                "line": 8,
+                "column": 21
+              },
+              "kind": "literal",
+              "value": "string"
+            }
+          },
+          "position": {
+            "start": 219,
+            "end": 246,
+            "line": 8,
+            "column": 3
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "h",
+          "handler": {
+            "source": "a = 1; save()",
+            "position": {
+              "start": 254,
+              "end": 267,
+              "line": 9,
+              "column": 8
+            },
+            "kind": "chain",
+            "exprs": [
+              {
+                "source": "",
+                "position": {
+                  "start": 272,
+                  "end": 272,
+                  "line": 11,
+                  "column": 1
+                },
+                "kind": "binary",
+                "operator": "=",
+                "left": {
+                  "source": "a",
+                  "position": {
+                    "start": 254,
+                    "end": 255,
+                    "line": 9,
+                    "column": 8
+                  },
+                  "kind": "read",
+                  "name": "a",
+                  "safe": false
+                },
+                "right": {
+                  "source": "1",
+                  "position": {
+                    "start": 258,
+                    "end": 259,
+                    "line": 9,
+                    "column": 12
+                  },
+                  "kind": "literal",
+                  "value": 1.0
+                }
+              },
+              {
+                "source": "save()",
+                "position": {
+                  "start": 261,
+                  "end": 267,
+                  "line": 9,
+                  "column": 15
+                },
+                "kind": "call",
+                "callee": {
+                  "source": "save",
+                  "position": {
+                    "start": 261,
+                    "end": 265,
+                    "line": 9,
+                    "column": 15
+                  },
+                  "kind": "read",
+                  "name": "save",
+                  "safe": false
+                },
+                "args": [],
+                "safe": false
+              }
+            ]
+          },
+          "position": {
+            "start": 249,
+            "end": 268,
+            "line": 9,
+            "column": 3
+          }
+        }
+      ],
+      "refs": [],
+      "selfClosing": true,
+      "children": []
+    }
+  ],
+  "errors": []
+}

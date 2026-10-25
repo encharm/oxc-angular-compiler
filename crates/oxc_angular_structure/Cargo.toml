@@ -1,0 +1,31 @@
+[package]
+name = "oxc_angular_structure"
+version = "0.1.0"
+authors.workspace = true
+categories.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Angular templates as data: the R3 tree with structured expressions, as typed JSON with TypeScript declarations"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+oxc_angular_compiler = { workspace = true }
+oxc_allocator = { workspace = true }
+oxc_ast = { workspace = true }
+oxc_parser = { workspace = true }
+oxc_span = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+ts-rs = { version = "12.0.1", features = ["serde-json-impl", "no-serde-warnings"] }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["json", "glob"] }
+
+[lints]
+workspace = true

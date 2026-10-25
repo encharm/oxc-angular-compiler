@@ -1,0 +1,20 @@
+---
+source: crates/oxc_angular_structure/tests/snapshots.rs
+expression: "parse_template(&template, \"fixture.html\", WriteOptions::default())"
+input_file: crates/oxc_angular_structure/tests/fixtures/parse-error.html
+---
+{
+  "version": 1,
+  "nodes": [],
+  "errors": [
+    {
+      "message": "Unexpected closing tag \"div\". It may happen when the tag has already been closed by another tag. For more info see https://www.w3.org/TR/html5/syntax.html#closing-elements-that-have-implied-end-tags",
+      "position": {
+        "start": 15,
+        "end": 15,
+        "line": 3,
+        "column": 1
+      }
+    }
+  ]
+}

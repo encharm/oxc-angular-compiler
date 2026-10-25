@@ -53,8 +53,6 @@ pub mod pipeline;
 pub mod r3;
 pub mod schema;
 pub mod service;
-#[cfg(feature = "structure")]
-pub mod structure;
 pub mod styles;
 pub mod transform;
 
