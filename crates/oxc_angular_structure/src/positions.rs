@@ -57,6 +57,14 @@ impl<'s> Positions<'s> {
         }
     }
 
+    /// The position of the UTF-16 offsets `start..end` (JavaScript string indices, as ng-analyze counts).
+    pub fn of_utf16(&self, start: u32, end: u32) -> Position {
+        let byte = |offset: u32| {
+            u32::try_from(self.utf16.partition_point(|&u| u < offset)).unwrap_or(u32::MAX)
+        };
+        self.of(byte(start), byte(end))
+    }
+
     /// The text of the bytes `start..end`; empty when they are not a character range of the source.
     pub fn text(&self, start: u32, end: u32) -> &'s str {
         self.source.get(start as usize..end as usize).unwrap_or("")
@@ -75,6 +83,8 @@ mod tests {
         let pos = p.of(b, b + 1);
         assert_eq!((pos.start, pos.end, pos.line, pos.column), (5, 6, 2, 2));
         assert_eq!(p.of(2, 6).start, 1);
+        let back = p.of_utf16(5, 6);
+        assert_eq!((back.start, back.end, back.line, back.column), (5, 6, 2, 2));
         assert_eq!(p.of(2, 6).end, 3);
     }
 }
