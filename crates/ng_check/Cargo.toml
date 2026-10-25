@@ -14,7 +14,7 @@ name = "ngcheck"
 path = "src/main.rs"
 
 [dependencies]
-oxc_angular_compiler = { workspace = true }
+oxc_angular_compiler = { workspace = true, features = ["structure"] }
 oxc_allocator = { workspace = true }
 oxc_span = { workspace = true }
 oxc_str = { workspace = true }

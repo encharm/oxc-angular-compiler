@@ -11,6 +11,7 @@ pub mod file_analysis;
 pub mod oob;
 pub mod processor;
 pub mod selectorless;
+pub mod structure;
 pub mod tcb;
 pub mod tcb_adapter;
 pub mod tcb_util;

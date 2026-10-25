@@ -1,6 +1,7 @@
 //! The `ngcheck` command line (not a port): type-checks a project's Angular templates.
 //!
 //!   ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep]
+//!   ngcheck -p <tsconfig.json> --structure <file|->
 //!
 //! 1. ng-analyze analyzes the project (the tsconfig's files and what they import).
 //! 2. Each file with components gets its type-check file (`processor`), written to a sibling of the source root,
@@ -10,6 +11,9 @@
 //! 4. Diagnostics in type-check files map back to the templates as ngtsc maps them (`crate::ngtsc`); the others are
 //!    the program's own TypeScript errors. They print as ngc prints them: `<file>:<line>:<col> - error <code>:
 //!    <message>`, paths relative to the working directory.
+//!
+//! `--structure` writes the components' templates as JSON instead, to the file or to stdout (`structure`): it type-checks
+//! nothing and runs no tsrs.
 //!
 //! Exit status: 0 with no errors, 1 with errors, 2 when it could not run.
 
@@ -26,6 +30,7 @@ use crate::ngp::compiler_options::NgpCompilerOptions;
 use crate::ngp::compiler_utils::TemplateParseOptions;
 use crate::ngp::file_analysis::FileCache;
 use crate::ngp::processor::{TypeCheckContext, type_check_file};
+use crate::ngp::structure::file_structure;
 use crate::ngp::tcb::{TcbTemplateSource, build_type_checking_config};
 use crate::ngtsc::tcb_util::TcbFile;
 use crate::typecheck::api::Map;
@@ -74,23 +79,26 @@ struct Args {
     /// Where the type-check files go, instead of beside the sources. Their package imports resolve from there, so it
     /// must reach the project's `node_modules` (a directory beside or inside the project).
     out: Option<PathBuf>,
+    /// Where the components' templates go as JSON (`-`: stdout), in place of the check
+    structure: Option<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
-    let (mut tsconfig, mut tsrs, mut keep, mut out) = (None, None, false, None);
+    let (mut tsconfig, mut tsrs, mut keep, mut out, mut structure) = (None, None, false, None, None);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-p" | "--project" => tsconfig = args.next().map(PathBuf::from),
             "--tsrs" => tsrs = args.next().map(PathBuf::from),
             "--keep" => keep = true,
             "--out" => out = args.next().map(PathBuf::from),
+            "--structure" => structure = Some(args.next().map(PathBuf::from).ok_or("missing --structure <file|->")?),
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument: {other}")),
         }
     }
     let tsconfig = tsconfig.ok_or("missing -p <tsconfig.json>")?;
-    Ok(Args { tsconfig, tsrs, keep, out })
+    Ok(Args { tsconfig, tsrs, keep, out, structure })
 }
 
 pub fn main() -> i32 {
@@ -101,9 +109,19 @@ pub fn main() -> i32 {
                 eprintln!("ngcheck: {message}");
             }
             eprintln!("usage: ngcheck -p <tsconfig.json> [--tsrs <path>] [--keep] [--out <dir>]");
+            eprintln!("       ngcheck -p <tsconfig.json> --structure <file|->");
             return 2;
         }
     };
+    if let Some(structure) = &args.structure {
+        return match write_structure(&args.tsconfig, structure) {
+            Ok(()) => 0,
+            Err(message) => {
+                eprintln!("ngcheck: {message}");
+                2
+            }
+        };
+    }
     match run(&args) {
         Ok(errors) => i32::from(errors > 0),
         Err(message) => {
@@ -235,6 +253,37 @@ fn run(args: &Args) -> Result<usize, String> {
 
 /// Analyzes the project with ng-analyze and generates each file's type-check block (`processor`)
 fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, String> {
+    for_each_file(tsconfig, |ctx, result| {
+        let path = PathBuf::from(&result.file_path);
+        let mut file = generate_file(ctx, &path, result)?;
+        // the analysis' own diagnostics (unsupported decorators, unresolvable metadata, ...)
+        file.diagnostics.extend(result.diagnostics.iter().map(|d| diagnostic_of(d, &path)));
+        Ok((path, file))
+    })
+}
+
+/// The components' templates as JSON (`structure`): `{ "components": [...] }`, to `out` or to stdout for `-`
+fn write_structure(tsconfig: &Path, out: &Path) -> Result<(), String> {
+    let tsconfig = std::fs::canonicalize(tsconfig).map_err(|e| format!("{}: {e}", tsconfig.display()))?;
+    let files = for_each_file(&tsconfig, |ctx, result| {
+        let content = ctx.analyzer.get_file_content_sync(&result.file_path)?;
+        Ok(file_structure(ctx, &result.file_path, &content, result))
+    })?;
+    let json = serde_json::json!({ "components": files.into_iter().flatten().collect::<Vec<_>>() }).to_string();
+    if out == Path::new("-") {
+        use std::io::Write;
+        std::io::stdout().write_all(json.as_bytes()).map_err(|e| e.to_string())
+    } else {
+        std::fs::write(out, json).map_err(|e| format!("{}: {e}", out.display()))
+    }
+}
+
+/// Analyzes the project with ng-analyze and hands each file it compiles to `each`, with one allocator and file cache
+/// for the run: files share their dependencies' parsed templates
+fn for_each_file<T>(
+    tsconfig: &Path,
+    each: impl Fn(&TypeCheckContext<'_, '_>, &ng_analyze::AnalysisResult) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
     let options = read_angular_options(tsconfig)?;
     let tcb_config = build_type_checking_config(&options, false, false);
     let template_parse_options = template_parse_options(&options);
@@ -242,7 +291,6 @@ fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, St
     let metadata_map: Map<String, ng_analyze::AnalysisResult> =
         files.iter().map(|result| (result.file_path.clone(), result.clone())).collect();
 
-    // one allocator and file cache for the run: files share their dependencies' parsed templates
     let allocator = Allocator::default();
     let file_cache = RefCell::new(FileCache::default());
     let ctx = TypeCheckContext {
@@ -253,15 +301,7 @@ fn generate_project(tsconfig: &Path) -> Result<Vec<(PathBuf, GeneratedFile)>, St
         template_parse_options: Some(&template_parse_options),
         metadata_map: Some(&metadata_map),
     };
-    let mut generated = vec![];
-    for result in &files {
-        let path = PathBuf::from(&result.file_path);
-        let mut file = generate_file(&ctx, &path, result)?;
-        // the analysis' own diagnostics (unsupported decorators, unresolvable metadata, ...)
-        file.diagnostics.extend(result.diagnostics.iter().map(|d| diagnostic_of(d, &path)));
-        generated.push((path, file));
-    }
-    Ok(generated)
+    files.iter().map(|result| each(&ctx, result)).collect()
 }
 
 /// The version of the project's `@angular/compiler` (`VERSION.full`), from the nearest `node_modules`; else the version
