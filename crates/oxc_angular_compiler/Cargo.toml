@@ -35,10 +35,13 @@ lightningcss = "1.0.0-alpha.71"
 oxc_resolver = { version = "11", optional = true }
 pathdiff = { version = "0.2", optional = true }
 semver = "1.0.27"
+serde_json = { workspace = true, optional = true }
 
 [features]
 default = []
 cross_file_elision = ["oxc_resolver", "pathdiff"]
+# `structure`: a template's R3 tree as JSON
+structure = ["dep:serde_json"]
 
 [dev-dependencies]
 insta = { workspace = true, features = ["glob"] }
