@@ -68,6 +68,8 @@ fn declarations_are_current() {
         std::fs::write(path, &generated).unwrap();
         return;
     }
+    // a doc comment that closed early would end its JSDoc there and break the declarations that follow
+    assert_eq!(generated.matches("/**").count(), generated.matches("*/").count(), "a doc comment in schema.rs holds `*/`");
     let committed = std::fs::read_to_string(path).unwrap_or_default();
     assert!(
         committed == generated,

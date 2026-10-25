@@ -563,7 +563,7 @@ pub struct ClassMember {
     pub kind: MemberKind,
     #[serde(rename = "static")]
     pub is_static: bool,
-    /// The JSDoc written right before it, without its `/** */` and leading `*`s
+    /// The JSDoc written right before it: its text, without the comment's delimiters and each line's leading asterisk
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub doc: Option<String>,
