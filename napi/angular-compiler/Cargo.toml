@@ -24,7 +24,9 @@ doctest = false
 
 [dependencies]
 oxc_allocator = { workspace = true }
-oxc_angular_compiler = { workspace = true, features = ["structure"] }
+oxc_angular_compiler = { workspace = true }
+oxc_angular_structure = { workspace = true }
+serde_json = { workspace = true }
 oxc_ast = { workspace = true }
 oxc_napi = { workspace = true }
 oxc_parser = { workspace = true }

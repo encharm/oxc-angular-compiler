@@ -103,6 +103,7 @@ oxc_codegen = "0.155"
 
 # Internal
 oxc_angular_compiler = { path = "crates/oxc_angular_compiler" }
+oxc_angular_structure = { path = "crates/oxc_angular_structure" }
 
 # NAPI dependencies
 napi = { version = "3", features = ["tokio_rt"] }

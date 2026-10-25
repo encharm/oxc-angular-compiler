@@ -1,0 +1,794 @@
+---
+source: crates/oxc_angular_structure/tests/snapshots.rs
+expression: "parse_template(&template, \"fixture.html\", WriteOptions::default())"
+input_file: crates/oxc_angular_structure/tests/fixtures/control-flow.html
+---
+{
+  "version": 1,
+  "nodes": [
+    {
+      "type": "if",
+      "id": 0,
+      "position": {
+        "start": 0,
+        "end": 151,
+        "line": 1,
+        "column": 1
+      },
+      "branches": [
+        {
+          "id": 1,
+          "position": {
+            "start": 0,
+            "end": 63,
+            "line": 1,
+            "column": 1
+          },
+          "condition": {
+            "source": "editor.selectedTool",
+            "position": {
+              "start": 5,
+              "end": 24,
+              "line": 1,
+              "column": 6
+            },
+            "kind": "read",
+            "name": "selectedTool",
+            "receiver": {
+              "source": "editor",
+              "position": {
+                "start": 5,
+                "end": 11,
+                "line": 1,
+                "column": 6
+              },
+              "kind": "read",
+              "name": "editor",
+              "safe": false
+            },
+            "safe": false
+          },
+          "alias": "tool",
+          "children": [
+            {
+              "type": "element",
+              "id": 2,
+              "position": {
+                "start": 39,
+                "end": 61,
+                "line": 2,
+                "column": 3
+              },
+              "name": "i",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "boundText",
+                  "position": {
+                    "start": 42,
+                    "end": 57,
+                    "line": 2,
+                    "column": 6
+                  },
+                  "expr": {
+                    "source": "{{ tool.name }}",
+                    "position": {
+                      "start": 42,
+                      "end": 57,
+                      "line": 2,
+                      "column": 6
+                    },
+                    "kind": "interpolation",
+                    "strings": [
+                      "",
+                      ""
+                    ],
+                    "exprs": [
+                      {
+                        "source": "tool.name",
+                        "position": {
+                          "start": 45,
+                          "end": 54,
+                          "line": 2,
+                          "column": 9
+                        },
+                        "kind": "read",
+                        "name": "name",
+                        "receiver": {
+                          "source": "tool",
+                          "position": {
+                            "start": 45,
+                            "end": 49,
+                            "line": 2,
+                            "column": 9
+                          },
+                          "kind": "read",
+                          "name": "tool",
+                          "safe": false
+                        },
+                        "safe": false
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "position": {
+            "start": 64,
+            "end": 127,
+            "line": 3,
+            "column": 3
+          },
+          "condition": {
+            "source": "videoControls && !model3dControls",
+            "position": {
+              "start": 74,
+              "end": 107,
+              "line": 3,
+              "column": 13
+            },
+            "kind": "binary",
+            "operator": "&&",
+            "left": {
+              "source": "videoControls",
+              "position": {
+                "start": 74,
+                "end": 87,
+                "line": 3,
+                "column": 13
+              },
+              "kind": "read",
+              "name": "videoControls",
+              "safe": false
+            },
+            "right": {
+              "source": "!model3dControls",
+              "position": {
+                "start": 91,
+                "end": 107,
+                "line": 3,
+                "column": 30
+              },
+              "kind": "not",
+              "operand": {
+                "source": "model3dControls",
+                "position": {
+                  "start": 92,
+                  "end": 107,
+                  "line": 3,
+                  "column": 31
+                },
+                "kind": "read",
+                "name": "model3dControls",
+                "safe": false
+              }
+            }
+          },
+          "children": [
+            {
+              "type": "element",
+              "id": 4,
+              "position": {
+                "start": 113,
+                "end": 125,
+                "line": 4,
+                "column": 3
+              },
+              "name": "b",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "text",
+                  "position": {
+                    "start": 116,
+                    "end": 121,
+                    "line": 4,
+                    "column": 6
+                  },
+                  "value": "video"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "position": {
+            "start": 128,
+            "end": 151,
+            "line": 5,
+            "column": 3
+          },
+          "children": [
+            {
+              "type": "element",
+              "id": 6,
+              "position": {
+                "start": 138,
+                "end": 149,
+                "line": 6,
+                "column": 3
+              },
+              "name": "u",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "text",
+                  "position": {
+                    "start": 141,
+                    "end": 145,
+                    "line": 6,
+                    "column": 6
+                  },
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "for",
+      "id": 7,
+      "position": {
+        "start": 152,
+        "end": 308,
+        "line": 8,
+        "column": 1
+      },
+      "expr": {
+        "source": "items()",
+        "position": {
+          "start": 166,
+          "end": 173,
+          "line": 8,
+          "column": 15
+        },
+        "kind": "call",
+        "callee": {
+          "source": "items",
+          "position": {
+            "start": 166,
+            "end": 171,
+            "line": 8,
+            "column": 15
+          },
+          "kind": "read",
+          "name": "items",
+          "safe": false
+        },
+        "args": [],
+        "safe": false
+      },
+      "item": "item",
+      "track": {
+        "source": "item.id",
+        "position": {
+          "start": 181,
+          "end": 188,
+          "line": 8,
+          "column": 30
+        },
+        "kind": "read",
+        "name": "id",
+        "receiver": {
+          "source": "item",
+          "position": {
+            "start": 181,
+            "end": 185,
+            "line": 8,
+            "column": 30
+          },
+          "kind": "read",
+          "name": "item",
+          "safe": false
+        },
+        "safe": false
+      },
+      "contextVars": [
+        {
+          "name": "$index",
+          "value": "$index"
+        },
+        {
+          "name": "$first",
+          "value": "$first"
+        },
+        {
+          "name": "$last",
+          "value": "$last"
+        },
+        {
+          "name": "$even",
+          "value": "$even"
+        },
+        {
+          "name": "$odd",
+          "value": "$odd"
+        },
+        {
+          "name": "$count",
+          "value": "$count"
+        },
+        {
+          "name": "i",
+          "value": "$index"
+        },
+        {
+          "name": "last",
+          "value": "$last"
+        }
+      ],
+      "children": [
+        {
+          "type": "element",
+          "id": 8,
+          "position": {
+            "start": 224,
+            "end": 278,
+            "line": 9,
+            "column": 3
+          },
+          "name": "li",
+          "attrs": [],
+          "inputs": [
+            {
+              "name": "last",
+              "binding": "class",
+              "expr": {
+                "source": "last",
+                "position": {
+                  "start": 242,
+                  "end": 246,
+                  "line": 9,
+                  "column": 21
+                },
+                "kind": "read",
+                "name": "last",
+                "safe": false
+              },
+              "position": {
+                "start": 228,
+                "end": 247,
+                "line": 9,
+                "column": 7
+              }
+            }
+          ],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "boundText",
+              "position": {
+                "start": 248,
+                "end": 273,
+                "line": 9,
+                "column": 27
+              },
+              "expr": {
+                "source": "{{ i }}: {{ item.label }}",
+                "position": {
+                  "start": 248,
+                  "end": 273,
+                  "line": 9,
+                  "column": 27
+                },
+                "kind": "interpolation",
+                "strings": [
+                  "",
+                  ": ",
+                  ""
+                ],
+                "exprs": [
+                  {
+                    "source": "i",
+                    "position": {
+                      "start": 251,
+                      "end": 252,
+                      "line": 9,
+                      "column": 30
+                    },
+                    "kind": "read",
+                    "name": "i",
+                    "safe": false
+                  },
+                  {
+                    "source": "item.label",
+                    "position": {
+                      "start": 260,
+                      "end": 270,
+                      "line": 9,
+                      "column": 39
+                    },
+                    "kind": "read",
+                    "name": "label",
+                    "receiver": {
+                      "source": "item",
+                      "position": {
+                        "start": 260,
+                        "end": 264,
+                        "line": 9,
+                        "column": 39
+                      },
+                      "kind": "read",
+                      "name": "item",
+                      "safe": false
+                    },
+                    "safe": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "empty": [
+        {
+          "type": "element",
+          "id": 9,
+          "position": {
+            "start": 292,
+            "end": 306,
+            "line": 11,
+            "column": 3
+          },
+          "name": "li",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "text",
+              "position": {
+                "start": 296,
+                "end": 301,
+                "line": 11,
+                "column": 7
+              },
+              "value": "empty"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "switch",
+      "id": 10,
+      "position": {
+        "start": 309,
+        "end": 463,
+        "line": 13,
+        "column": 1
+      },
+      "expr": {
+        "source": "mode",
+        "position": {
+          "start": 318,
+          "end": 322,
+          "line": 13,
+          "column": 10
+        },
+        "kind": "read",
+        "name": "mode",
+        "safe": false
+      },
+      "groups": [
+        {
+          "cases": [
+            {
+              "source": "'brush'",
+              "position": {
+                "start": 335,
+                "end": 342,
+                "line": 14,
+                "column": 10
+              },
+              "kind": "literal",
+              "value": "brush"
+            }
+          ],
+          "children": [
+            {
+              "type": "element",
+              "id": 11,
+              "position": {
+                "start": 346,
+                "end": 364,
+                "line": 14,
+                "column": 21
+              },
+              "name": "span",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "text",
+                  "position": {
+                    "start": 352,
+                    "end": 357,
+                    "line": 14,
+                    "column": 27
+                  },
+                  "value": "brush"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cases": [
+            {
+              "source": "'shape'",
+              "position": {
+                "start": 376,
+                "end": 383,
+                "line": 15,
+                "column": 10
+              },
+              "kind": "literal",
+              "value": "shape"
+            },
+            {
+              "source": "'pattern'",
+              "position": {
+                "start": 392,
+                "end": 401,
+                "line": 15,
+                "column": 26
+              },
+              "kind": "literal",
+              "value": "pattern"
+            }
+          ],
+          "children": [
+            {
+              "type": "element",
+              "id": 12,
+              "position": {
+                "start": 405,
+                "end": 425,
+                "line": 15,
+                "column": 39
+              },
+              "name": "span",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "text",
+                  "position": {
+                    "start": 411,
+                    "end": 418,
+                    "line": 15,
+                    "column": 45
+                  },
+                  "value": "presets"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cases": [
+            null
+          ],
+          "children": [
+            {
+              "type": "element",
+              "id": 13,
+              "position": {
+                "start": 441,
+                "end": 459,
+                "line": 16,
+                "column": 14
+              },
+              "name": "span",
+              "attrs": [],
+              "inputs": [],
+              "outputs": [],
+              "refs": [],
+              "selfClosing": false,
+              "children": [
+                {
+                  "type": "text",
+                  "position": {
+                    "start": 447,
+                    "end": 452,
+                    "line": 16,
+                    "column": 20
+                  },
+                  "value": "other"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "defer",
+      "id": 14,
+      "position": {
+        "start": 464,
+        "end": 568,
+        "line": 18,
+        "column": 1
+      },
+      "children": [
+        {
+          "type": "element",
+          "id": 15,
+          "position": {
+            "start": 487,
+            "end": 500,
+            "line": 18,
+            "column": 24
+          },
+          "name": "big-chart",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": true,
+          "children": []
+        }
+      ],
+      "placeholder": [
+        {
+          "type": "element",
+          "id": 16,
+          "position": {
+            "start": 518,
+            "end": 532,
+            "line": 18,
+            "column": 55
+          },
+          "name": "span",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "text",
+              "position": {
+                "start": 524,
+                "end": 525,
+                "line": 18,
+                "column": 61
+              },
+              "value": "…"
+            }
+          ]
+        }
+      ],
+      "loading": [
+        {
+          "type": "element",
+          "id": 17,
+          "position": {
+            "start": 546,
+            "end": 566,
+            "line": 18,
+            "column": 83
+          },
+          "name": "span",
+          "attrs": [],
+          "inputs": [],
+          "outputs": [],
+          "refs": [],
+          "selfClosing": false,
+          "children": [
+            {
+              "type": "text",
+              "position": {
+                "start": 552,
+                "end": 559,
+                "line": 18,
+                "column": 89
+              },
+              "value": "loading"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "let",
+      "id": 18,
+      "position": {
+        "start": 569,
+        "end": 592,
+        "line": 19,
+        "column": 1
+      },
+      "name": "total",
+      "expr": {
+        "source": "a + b * 2",
+        "position": {
+          "start": 582,
+          "end": 591,
+          "line": 19,
+          "column": 14
+        },
+        "kind": "binary",
+        "operator": "+",
+        "left": {
+          "source": "a",
+          "position": {
+            "start": 582,
+            "end": 583,
+            "line": 19,
+            "column": 14
+          },
+          "kind": "read",
+          "name": "a",
+          "safe": false
+        },
+        "right": {
+          "source": "b * 2",
+          "position": {
+            "start": 586,
+            "end": 591,
+            "line": 19,
+            "column": 18
+          },
+          "kind": "binary",
+          "operator": "*",
+          "left": {
+            "source": "b",
+            "position": {
+              "start": 586,
+              "end": 587,
+              "line": 19,
+              "column": 18
+            },
+            "kind": "read",
+            "name": "b",
+            "safe": false
+          },
+          "right": {
+            "source": "2",
+            "position": {
+              "start": 590,
+              "end": 591,
+              "line": 19,
+              "column": 22
+            },
+            "kind": "literal",
+            "value": 2.0
+          }
+        }
+      }
+    }
+  ],
+  "errors": []
+}

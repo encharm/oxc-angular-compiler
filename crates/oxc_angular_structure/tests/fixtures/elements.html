@@ -1,0 +1,6 @@
+<button command="copy" class="btn" [attr.data-hint-value]="tool.size" [disabled]="!canCopy()" (click)="copy($event)" #btn>
+  Copy
+</button>
+<input [(ngModel)]="name" [class.active]="isActive" [style.width.px]="width" />
+<p>Don't worry — it's fine: {{ count | number:'1.0-0' }} é😀</p>
+<ng-content select="[slot]" />
