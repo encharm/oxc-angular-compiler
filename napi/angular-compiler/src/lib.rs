@@ -875,6 +875,18 @@ pub fn encapsulate_style(css: String, component_id: String) -> String {
     rust_encapsulate_style(&css, &component_id)
 }
 
+/// A template's structure as JSON text: `{ nodes, errors }`, the R3 tree with each expression's source text, parsed as
+/// the compiler parses it (node shapes in `oxc_angular_compiler::structure`).
+///
+/// # Arguments
+///
+/// * `template` - The template source
+/// * `file_path` - The template's path, for messages
+#[napi]
+pub fn parse_template_structure_sync(template: String, file_path: String) -> String {
+    oxc_angular_compiler::structure::parse_template_structure(&template, &file_path).to_string()
+}
+
 /// URLs extracted from @Component decorators in a file.
 #[napi(object)]
 pub struct ComponentUrls {
