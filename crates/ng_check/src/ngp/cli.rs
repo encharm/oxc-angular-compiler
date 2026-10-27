@@ -168,7 +168,7 @@ fn run(args: &Args) -> Result<usize, String> {
     let tsrs = args.tsrs.clone().map_or_else(find_tsrs, Ok)?;
     let output = Command::new(&tsrs)
         .args(["--noEmit", "--pretty", "false", "-p"])
-        .arg(&program_tsconfig)
+        .arg(without_verbatim_prefix(&program_tsconfig))
         .output()
         .map_err(|e| format!("{}: {e}", tsrs.display()))?;
     let text = String::from_utf8_lossy(&output.stdout).into_owned() + &String::from_utf8_lossy(&output.stderr);
@@ -245,7 +245,9 @@ fn run(args: &Args) -> Result<usize, String> {
         match &d.file {
             Some(file) => {
                 let (line, col) = line_col(file, d.start);
-                let shown = file.strip_prefix(&cwd).unwrap_or(file);
+                // the working directory is no verbatim path
+                let file = without_verbatim_prefix(file);
+                let shown = file.strip_prefix(&cwd).unwrap_or(&file);
                 println!("{}:{line}:{col} - {category} {}: {}", shown.display(), d.code, d.message);
             }
             None => println!("{category} {}: {}", d.code, d.message),
@@ -613,6 +615,27 @@ fn path_relative(from: &Path, to: &Path) -> PathBuf {
     path
 }
 
+/// `path` without the verbatim prefix `canonicalize` gives it on Windows (`\\?\C:\x` → `C:\x`, `\\?\UNC\server\share\x`
+/// → `\\server\share\x`), for the programs that don't take one: tsrs given the program's tsconfig by its verbatim path
+/// matches none of the tsconfig's `include` patterns, the type-check files' among them
+fn without_verbatim_prefix(path: &Path) -> PathBuf {
+    use std::path::{Component, Prefix};
+    let mut components = path.components();
+    let Some(Component::Prefix(prefix)) = components.next() else { return path.to_path_buf() };
+    let mut plain = std::ffi::OsString::new();
+    match prefix.kind() {
+        Prefix::VerbatimDisk(drive) => plain.push(format!("{}:", char::from(drive))),
+        Prefix::VerbatimUNC(server, share) => {
+            plain.push(r"\\");
+            plain.push(server);
+            plain.push(r"\");
+            plain.push(share);
+        }
+        _ => return path.to_path_buf(),
+    }
+    PathBuf::from(plain).join(components.as_path())
+}
+
 /// A diagnostic as `tsc --pretty false` prints it
 #[derive(Debug, Clone)]
 struct TscDiagnostic {
@@ -732,6 +755,17 @@ mod tests {
     fn relative_paths() {
         assert_eq!(path_relative(Path::new("/a/.ngcheck-src"), Path::new("/a/src/tsconfig.json")), PathBuf::from("../src/tsconfig.json"));
         assert_eq!(common_root([Path::new("/a/src/x/y.ts"), Path::new("/a/src/z.ts")].into_iter()), Some(PathBuf::from("/a/src")));
+    }
+
+    #[test]
+    fn verbatim_prefixes() {
+        let plain = |path: &str| without_verbatim_prefix(Path::new(path)).into_os_string();
+        if cfg!(windows) {
+            assert_eq!(plain(r"\\?\C:\a\tsconfig.json"), r"C:\a\tsconfig.json");
+            assert_eq!(plain(r"\\?\UNC\server\share\a"), r"\\server\share\a");
+            assert_eq!(plain(r"C:\a"), r"C:\a");
+        }
+        assert_eq!(plain("/a/tsconfig.json"), "/a/tsconfig.json");
     }
 
     #[test]
