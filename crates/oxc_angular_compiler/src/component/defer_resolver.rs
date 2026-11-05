@@ -35,6 +35,13 @@
 //! class's selector: then [`implicitly_deferred_imports`] picks the
 //! standalone components and directives the template matches only inside
 //! `@defer` blocks, and they join `deferredImports` (#313).
+//!
+//! Like ngc's full compilation (its PerBlock emit), each `@defer` block then
+//! loads only the ones it uses: [`deferred_imports_per_block`] says which,
+//! and [`build_defer_block_resolvers`] builds one function per block, which
+//! the pipeline hoists to a `<View>_Defer_<slot>_DepsFn` constant. Explicit
+//! `deferredImports` don't say what block uses them, so with any of those
+//! every block shares the per-component function above.
 
 use oxc_allocator::Allocator;
 
@@ -50,7 +57,9 @@ use crate::i18n::serializer::is_i18n_attribute;
 use crate::output::ast::OutputExpression;
 use crate::parser::html::split_ns_name;
 use crate::pipeline::selector::CssSelector;
+use oxc_span::Span;
 use oxc_str::Ident;
+use rustc_hash::FxHashMap;
 
 use super::metadata::ComponentMetadata;
 use super::transform::ImportMap;
@@ -182,23 +191,99 @@ pub(super) fn implicitly_deferred_imports<'a>(
     nodes: &[R3Node<'a>],
     candidates: &[(Ident<'a>, std::vec::Vec<CssSelector>)],
 ) -> std::vec::Vec<Ident<'a>> {
+    let Some(matches) = match_candidates(nodes, candidates) else {
+        return std::vec::Vec::new();
+    };
+    candidates
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| {
+            !matches.eager[*index] && matches.blocks.iter().any(|(_, matched)| matched[*index])
+        })
+        .map(|(_, (name, _))| *name)
+        .collect()
+}
+
+/// The `candidates` each `@defer` block loads, by the block's source span:
+/// the ones matched in its main content and in the `@placeholder`, `@loading`
+/// and `@error` of the `@defer` blocks inside it, whose main content loads its
+/// own. ngc binds each block's `children` alike for its PerBlock emit
+/// (`resolveDeferBlocks` in its component `handler.ts`). Every `@defer` block
+/// has an entry, without names when it loads none; a selectorless template
+/// returns none.
+pub(super) fn deferred_imports_per_block<'a>(
+    nodes: &[R3Node<'a>],
+    candidates: &[(Ident<'a>, std::vec::Vec<CssSelector>)],
+) -> std::vec::Vec<(Span, std::vec::Vec<Ident<'a>>)> {
+    let Some(matches) = match_candidates(nodes, candidates) else {
+        return std::vec::Vec::new();
+    };
+    matches
+        .blocks
+        .into_iter()
+        .map(|(span, matched)| {
+            let names = candidates
+                .iter()
+                .zip(matched)
+                .filter(|(_, matched)| *matched)
+                .map(|((name, _), _)| *name)
+                .collect();
+            (span, names)
+        })
+        .collect()
+}
+
+/// One dependency function per `@defer` block for the PerBlock emit, from
+/// [`deferred_imports_per_block`]: `None` for a block that loads nothing.
+pub(super) fn build_defer_block_resolvers<'a>(
+    allocator: &'a Allocator,
+    blocks: std::vec::Vec<(Span, std::vec::Vec<Ident<'a>>)>,
+    import_map: &ImportMap<'a>,
+) -> FxHashMap<Span, Option<OutputExpression<'a>>> {
+    blocks
+        .into_iter()
+        .map(|(span, names)| {
+            let deps = build_defer_per_component_deps(allocator, &names, import_map);
+            let resolver = (!deps.is_empty())
+                .then(|| compile_component_metadata_async_resolver(allocator, &deps));
+            (span, resolver)
+        })
+        .collect()
+}
+
+/// Which candidates a template matches where.
+struct Matches {
+    /// Matched outside the main content of every `@defer` block
+    eager: std::vec::Vec<bool>,
+    /// Each `@defer` block's source span and the candidates it loads, as
+    /// [`deferred_imports_per_block`] says
+    blocks: std::vec::Vec<(Span, std::vec::Vec<bool>)>,
+}
+
+/// Matches the template's elements against `candidates`; `None` when the
+/// template is selectorless.
+fn match_candidates<'a>(
+    nodes: &[R3Node<'a>],
+    candidates: &[(Ident<'a>, std::vec::Vec<CssSelector>)],
+) -> Option<Matches> {
     struct Matcher<'c, 'a> {
         candidates: &'c [(Ident<'a>, std::vec::Vec<CssSelector>)],
-        in_defer: bool,
-        deferred: std::vec::Vec<bool>,
-        eager: std::vec::Vec<bool>,
+        /// The `@defer` block the visited nodes load with, an index into
+        /// `matches.blocks`, or `None` outside every block
+        block: Option<usize>,
+        matches: Matches,
         selectorless: bool,
     }
 
     impl Matcher<'_, '_> {
         fn record(&mut self, element: &CssSelector) {
+            let matched = match self.block {
+                Some(block) => &mut self.matches.blocks[block].1,
+                None => &mut self.matches.eager,
+            };
             for (index, (_, selectors)) in self.candidates.iter().enumerate() {
                 if selectors.iter().any(|selector| selector.matches(element)) {
-                    if self.in_defer {
-                        self.deferred[index] = true;
-                    } else {
-                        self.eager[index] = true;
-                    }
+                    matched[index] = true;
                 }
             }
         }
@@ -227,15 +312,16 @@ pub(super) fn implicitly_deferred_imports<'a>(
         }
 
         fn visit_deferred_block(&mut self, block: &R3DeferredBlock<'a>) {
-            let outer = self.in_defer;
-            self.in_defer = true;
+            let outer = self.block;
+            self.block = Some(self.matches.blocks.len());
+            self.matches.blocks.push((block.source_span, vec![false; self.candidates.len()]));
             for child in &block.children {
                 child.visit(self);
             }
             // `@placeholder`, `@loading` and `@error` render before the chunk
-            // loads, so they are eager unless an outer `@defer` holds them
-            // (`visitDeferredBlock` in t2_binder's `DirectiveBinder`).
-            self.in_defer = outer;
+            // loads, so they load with the outer `@defer`, or are eager outside
+            // one (`visitDeferredBlock` in t2_binder's `DirectiveBinder`).
+            self.block = outer;
             if let Some(placeholder) = &block.placeholder {
                 self.visit_deferred_block_placeholder(placeholder);
             }
@@ -258,21 +344,12 @@ pub(super) fn implicitly_deferred_imports<'a>(
 
     let mut matcher = Matcher {
         candidates,
-        in_defer: false,
-        deferred: vec![false; candidates.len()],
-        eager: vec![false; candidates.len()],
+        block: None,
+        matches: Matches { eager: vec![false; candidates.len()], blocks: std::vec::Vec::new() },
         selectorless: false,
     };
     visit_all(&mut matcher, nodes);
-    if matcher.selectorless {
-        return std::vec::Vec::new();
-    }
-    candidates
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| matcher.deferred[*index] && !matcher.eager[*index])
-        .map(|(_, (name, _))| *name)
-        .collect()
+    (!matcher.selectorless).then_some(matcher.matches)
 }
 
 /// An element as Angular matches directives against it
