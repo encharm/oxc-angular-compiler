@@ -91,9 +91,10 @@ export class Parent {}
     let compact = compact(code);
 
     assert_lazy(code, "./lazy", "LazyCmp");
-    assert!(
-        compact.contains("ɵɵdefer(1,0,()=>[import(\"./lazy\")"),
-        "The resolver must be wired into `ɵɵdefer`. Output:\n{code}"
+    assert_eq!(
+        defer_blocks(code),
+        [block("Parent_Defer_1_DepsFn", &["./lazy"])],
+        "The block's resolver must be wired into `ɵɵdefer`. Output:\n{code}"
     );
     assert!(
         compact.contains("ɵɵgetComponentDepsFactory(Parent,[])"),
@@ -388,6 +389,234 @@ export class Parent {}
     );
     assert_lazy(&result.code, "./lazy", "LazyCmp");
     assert_lazy(&result.code, "./other", "Other");
+}
+
+// --- One resolver per `@defer` block, as in ngc's PerBlock emit ---
+
+/// What each `ɵɵdefer(...)` in `code` loads, in output order: the name of the
+/// constant holding its resolver (empty for an inline resolver or none) and
+/// the modules the resolver imports.
+fn defer_blocks(code: &str) -> Vec<(String, Vec<String>)> {
+    fn bracketed(s: &str) -> &str {
+        let mut depth = 0;
+        for (index, c) in s.char_indices() {
+            match c {
+                '[' => depth += 1,
+                ']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &s[..=index];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("No closing `]` in {s}");
+    }
+
+    let compact = compact(code);
+    let mut blocks = Vec::new();
+    for (index, call) in compact.match_indices("ɵɵdefer(") {
+        // `ɵɵdefer(slot, mainSlot, resolver, ...)`
+        let args = &compact[index + call.len()..];
+        let resolver = &args[args.find(|c: char| !c.is_ascii_digit() && c != ',').unwrap()..];
+        let (name, body) = if resolver.starts_with("()=>[") {
+            (String::new(), bracketed(resolver))
+        } else if resolver.starts_with(')') || resolver.starts_with("null") {
+            (String::new(), "")
+        } else {
+            let name = &resolver[..resolver.find([',', ')']).unwrap()];
+            let declaration = format!("const{name}=");
+            let start = compact
+                .find(&declaration)
+                .unwrap_or_else(|| panic!("No `const {name}` in the output:\n{code}"));
+            (name.to_string(), bracketed(&compact[start + declaration.len()..]))
+        };
+        let modules = body
+            .match_indices("import(\"")
+            .map(|(index, import)| {
+                let module = &body[index + import.len()..];
+                module[..module.find('"').unwrap()].to_string()
+            })
+            .collect();
+        blocks.push((name, modules));
+    }
+    blocks
+}
+
+fn block(name: &str, modules: &[&str]) -> (String, Vec<String>) {
+    (name.to_string(), modules.iter().map(ToString::to_string).collect())
+}
+
+/// `app/lazy.ts` with `app-lazy` and `app/other.ts` with `app-other`.
+fn lazy_and_other_cmps(dir: &TempDir) {
+    lazy_cmp(dir);
+    create_test_file(
+        dir.path(),
+        "app/other.ts",
+        r#"
+import { Component } from '@angular/core';
+
+@Component({ selector: 'app-other', template: 'other' })
+export class OtherCmp {}
+"#,
+    );
+}
+
+/// Compiles a parent component that imports `LazyCmp` and `OtherCmp` and
+/// uses `template`.
+fn lazy_and_other_transform(dir: &TempDir, template: &str) -> TransformResult {
+    lazy_and_other_cmps(dir);
+    transform(
+        dir,
+        &format!(
+            r#"
+import {{ Component }} from '@angular/core';
+import {{ LazyCmp }} from './lazy';
+import {{ OtherCmp }} from './other';
+
+@Component({{
+    selector: 'app-parent',
+    imports: [LazyCmp, OtherCmp],
+    template: `{template}`,
+}})
+export class Parent {{ show = true; }}
+"#
+        ),
+    )
+}
+
+#[test]
+fn each_block_loads_only_the_imports_it_uses() {
+    let dir = TempDir::new().unwrap();
+    let result =
+        lazy_and_other_transform(&dir, "@defer { <app-lazy/> } @defer (on idle) { <app-other/> }");
+    let code = &result.code;
+    assert_eq!(
+        defer_blocks(code),
+        [block("Parent_Defer_1_DepsFn", &["./lazy"]), block("Parent_Defer_4_DepsFn", &["./other"])],
+        "Output:\n{code}"
+    );
+    assert!(compact(code).contains("ɵɵgetComponentDepsFactory(Parent,[])"), "Output:\n{code}");
+    // `setClassMetadataAsync` loads every deferred import
+    assert!(
+        compact(code).contains(
+            "ɵsetClassMetadataAsync(Parent,()=>[import(\"./lazy\").then((m)=>m.LazyCmp),import(\"./other\").then((m)=>m.OtherCmp)]"
+        ),
+        "Output:\n{code}"
+    );
+}
+
+#[test]
+fn nested_block_loads_its_own_imports() {
+    let dir = TempDir::new().unwrap();
+    let result = lazy_and_other_transform(&dir, "@defer { <app-lazy/> @defer { <app-other/> } }");
+    let code = &result.code;
+    let mut blocks = defer_blocks(code);
+    blocks.sort();
+    assert_eq!(
+        blocks,
+        [
+            block("Parent_Defer_0_Defer_2_DepsFn", &["./other"]),
+            block("Parent_Defer_1_DepsFn", &["./lazy"]),
+        ],
+        "Output:\n{code}"
+    );
+}
+
+#[test]
+fn nested_placeholder_loads_with_the_outer_block() {
+    let dir = TempDir::new().unwrap();
+    let result = lazy_and_other_transform(
+        &dir,
+        "@defer { @defer { <app-other/> } @placeholder { <app-lazy/> } }",
+    );
+    let code = &result.code;
+    let mut blocks = defer_blocks(code);
+    blocks.sort();
+    assert_eq!(
+        blocks,
+        [
+            block("Parent_Defer_0_Defer_2_DepsFn", &["./other"]),
+            block("Parent_Defer_1_DepsFn", &["./lazy"]),
+        ],
+        "Output:\n{code}"
+    );
+}
+
+#[test]
+fn blocks_using_the_same_imports_share_one_function() {
+    let dir = TempDir::new().unwrap();
+    let result =
+        lazy_and_other_transform(&dir, "@defer { <app-lazy/> } @defer (on idle) { <app-lazy/> }");
+    let code = &result.code;
+    assert_eq!(
+        defer_blocks(code),
+        [block("Parent_Defer_1_DepsFn", &["./lazy"]), block("Parent_Defer_1_DepsFn", &["./lazy"])],
+        "Output:\n{code}"
+    );
+    assert_eq!(code.matches("_DepsFn = ").count(), 1, "Output:\n{code}");
+}
+
+#[test]
+fn block_without_lazy_imports_has_no_resolver() {
+    let dir = TempDir::new().unwrap();
+    let result =
+        lazy_and_other_transform(&dir, "@defer { <app-lazy/> } @defer (on idle) { <p>text</p> }");
+    let code = &result.code;
+    assert_eq!(
+        defer_blocks(code),
+        [block("Parent_Defer_1_DepsFn", &["./lazy"]), block("", &[])],
+        "Output:\n{code}"
+    );
+}
+
+#[test]
+fn block_inside_control_flow_has_its_own_function() {
+    let dir = TempDir::new().unwrap();
+    let result = lazy_and_other_transform(
+        &dir,
+        "@if (show) { @defer { <app-lazy/> } } @defer { <app-other/> }",
+    );
+    let code = &result.code;
+    let mut blocks = defer_blocks(code);
+    blocks.sort();
+    assert_eq!(
+        blocks,
+        [
+            block("Parent_Conditional_0_Defer_1_DepsFn", &["./lazy"]),
+            block("Parent_Defer_2_DepsFn", &["./other"]),
+        ],
+        "Output:\n{code}"
+    );
+}
+
+#[test]
+fn explicit_deferred_imports_share_one_resolver_across_blocks() {
+    let dir = TempDir::new().unwrap();
+    lazy_cmp(&dir);
+    let result = transform(
+        &dir,
+        r#"
+import { Component } from '@angular/core';
+import { LazyCmp } from './lazy';
+import { Other } from './other';
+
+@Component({
+    selector: 'app-parent',
+    imports: [LazyCmp],
+    deferredImports: [Other],
+    template: '@defer { <app-lazy/> } @defer (on idle) { <app-other/> }',
+})
+export class Parent {}
+"#,
+    );
+    let code = &result.code;
+    assert_eq!(
+        defer_blocks(code),
+        [block("", &["./other", "./lazy"]), block("", &["./other", "./lazy"])],
+        "Output:\n{code}"
+    );
 }
 
 #[test]

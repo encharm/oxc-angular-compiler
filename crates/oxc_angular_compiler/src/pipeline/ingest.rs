@@ -105,6 +105,14 @@ pub struct IngestOptions<'a> {
     /// Ported from Angular's ingestComponent parameter (line 65 in ingest.ts).
     pub all_deferrable_deps_fn: Option<OutputExpression<'a>>,
 
+    /// The dependency function of each defer block for PerBlock mode, by the
+    /// block's source span: `None` for a block that loads nothing.
+    ///
+    /// This corresponds to the `blocks` of Angular's `deferMeta` in full
+    /// compilation. A block missing from it uses `all_deferrable_deps_fn`, or
+    /// is an error without one.
+    pub defer_blocks: FxHashMap<oxc_span::Span, Option<OutputExpression<'a>>>,
+
     /// Starting index for the constant pool's name counter.
     ///
     /// This is used when compiling multiple components in the same file to ensure
@@ -143,6 +151,7 @@ impl Default for IngestOptions<'_> {
             enable_debug_locations: false,
             template_source: None,
             all_deferrable_deps_fn: None,
+            defer_blocks: FxHashMap::default(),
             pool_starting_index: 0,
             angular_version: None,
             legacy_optional_chaining: None,
@@ -889,7 +898,7 @@ pub fn ingest_component_with_options<'a>(
     // The all_deferrable_deps_fn is stored on the job and referenced during emit
     job.defer_meta = match options.defer_block_deps_emit_mode {
         DeferBlockDepsEmitMode::PerBlock => {
-            DeferMetadata::PerBlock { blocks: FxHashMap::default() }
+            DeferMetadata::PerBlock { blocks: options.defer_blocks }
         }
         DeferBlockDepsEmitMode::PerComponent => {
             // In PerComponent mode, dependencies_fn is set from all_deferrable_deps_fn during emit
@@ -3278,38 +3287,43 @@ fn ingest_defer_block<'a>(
     let error_template_xref =
         ingest_defer_view(job, view_xref, "Error", error_i18n, error_children, error_source_span);
 
-    // Set own_resolver_fn based on emit mode
+    // Set own_resolver_fn and resolver_fn based on emit mode
     // This matches Angular's ingestDeferBlock behavior (ingest.ts lines 663-672)
-    let own_resolver_fn = match &mut job.defer_meta {
+    //
+    // In PerComponent mode, all defer blocks share the same allDeferrableDepsFn reference.
+    // We clone it so each defer block gets its own copy (matching TypeScript's behavior
+    // where ReadVarExpr is shared by reference).
+    let shared_resolver_fn = &job.all_deferrable_deps_fn;
+    let (own_resolver_fn, resolver_fn) = match &mut job.defer_meta {
         DeferMetadata::PerBlock { blocks } => {
             // In PerBlock mode, look up the resolver from the blocks map using source_span
             // Use remove() to take ownership (move) since we can't clone OutputExpression
-            // TypeScript throws if the block is not in the map at all
+            // TypeScript throws if the block is not in the map at all; OXC first falls back to
+            // the component's shared function when it has one (Angular passes none in PerBlock
+            // mode)
             match blocks.remove(&defer_block.source_span) {
                 Some(value) => {
                     // Key exists - value may be None (no lazy deps) or Some (has deps)
-                    value
+                    (value, None)
+                }
+                None if shared_resolver_fn.is_some() => {
+                    (None, shared_resolver_fn.as_ref().map(|expr| expr.clone_in(job.allocator)))
                 }
                 None => {
                     // TypeScript: throw Error(`AssertionError: unable to find a dependency function for this deferred block`)
                     job.diagnostics.push(OxcDiagnostic::error(
                         "AssertionError: unable to find a dependency function for this deferred block",
                     ).with_label(defer_block.source_span));
-                    None
+                    (None, None)
                 }
             }
         }
         DeferMetadata::PerComponent { .. } => {
             // In PerComponent mode, own_resolver_fn is null
             // The shared all_deferrable_deps_fn is used instead
-            None
+            (None, shared_resolver_fn.as_ref().map(|expr| expr.clone_in(job.allocator)))
         }
     };
-
-    // In PerComponent mode, all defer blocks share the same allDeferrableDepsFn reference.
-    // We clone it so each defer block gets its own copy (matching TypeScript's behavior
-    // where ReadVarExpr is shared by reference).
-    let resolver_fn = job.all_deferrable_deps_fn.as_ref().map(|expr| expr.clone_in(job.allocator));
 
     // Calculate flags based on whether hydrate triggers exist.
     // Matches Angular's calcDeferBlockFlags function in ingest.ts

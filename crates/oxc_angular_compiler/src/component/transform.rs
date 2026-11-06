@@ -5077,8 +5077,12 @@ fn compile_component_full<'a>(
 
     // `imports` entries matched only inside `@defer` are lazy-loaded, as in
     // ngc's full compilation (#313). Needs cross-file analysis for the
-    // selectors; skipped under HMR, like ngc.
+    // selectors; skipped under HMR, like ngc. Without explicit
+    // `deferredImports`, which don't say what block uses them, each `@defer`
+    // block loads only the ones it uses (`defer_blocks`), as ngc's PerBlock
+    // emit does.
     let mut implicitly_deferred_imports = Vec::new();
+    let mut defer_blocks = Vec::new();
     if let Some(deferrable_selector) = deferrable_selector
         && !options.hmr
         && let Some(OutputExpression::LiteralArray(raw_imports)) = &metadata.raw_imports
@@ -5118,6 +5122,14 @@ fn compile_component_full<'a>(
                     !matches!(entry, OutputExpression::ReadVar(var) if is_deferred(var.name.as_str()))
                 });
             }
+            if metadata.deferred_imports.is_empty() && !options.jit {
+                let candidates: Vec<_> =
+                    candidates.into_iter().filter(|(name, _)| deferred.contains(name)).collect();
+                defer_blocks = super::defer_resolver::deferred_imports_per_block(
+                    &r3_result.nodes,
+                    &candidates,
+                );
+            }
             implicitly_deferred_imports = deferred.iter().map(ToString::to_string).collect();
             metadata.deferred_imports.extend(deferred);
         }
@@ -5126,11 +5138,13 @@ fn compile_component_full<'a>(
     // Build the deferrable-dependencies resolver from
     // `@Component.deferredImports`.
     //
-    // OXC is a single-file (local) compiler, so we use Angular's PerComponent
-    // emit mode for defer dependencies: a single shared resolver function is
-    // generated from the component's `deferredImports: [...]` array and
-    // wired into every `ɵɵdefer(...)` call. The runtime invokes it lazily,
-    // the first time any defer block triggers.
+    // With explicit `deferredImports` OXC uses Angular's local-compilation
+    // PerComponent emit mode: a single shared resolver function is generated
+    // from the component's `deferredImports: [...]` array and wired into
+    // every `ɵɵdefer(...)` call. The runtime invokes it lazily, the first
+    // time any defer block triggers. Implicitly deferred `imports` get one
+    // function per block instead (`defer_blocks` above), and the shared
+    // resolver is the fallback for a block missing from them.
     //
     // Issue: voidzero-dev/oxc-angular-compiler#289 — previously the resolver
     // was omitted entirely, leaving `ɵɵdefer(...)` with no dependency
@@ -5157,17 +5171,21 @@ fn compile_component_full<'a>(
         None
     };
 
-    // When we have a resolver, switch to PerComponent emit mode so the
-    // ingest stage threads `all_deferrable_deps_fn` into each `DeferOp`.
+    let defer_blocks =
+        super::defer_resolver::build_defer_block_resolvers(allocator, defer_blocks, import_map);
+
+    // PerBlock: the ingest stage gives each `DeferOp` its block's function
+    // from `defer_blocks`, hoisted to a `<View>_Defer_<slot>_DepsFn` constant
+    // that blocks with the same dependencies share. PerComponent: the ingest
+    // stage threads the shared `all_deferrable_deps_fn` into each `DeferOp`.
     // Without a resolver, the existing PerBlock-vs-JIT behavior stays in
     // place (and `all_deferrable_deps_fn = None`).
-    let defer_block_deps_emit_mode = if defer_resolver_fn.is_some() {
-        DeferBlockDepsEmitMode::PerComponent
-    } else if options.jit {
-        DeferBlockDepsEmitMode::PerComponent
-    } else {
-        DeferBlockDepsEmitMode::PerBlock
-    };
+    let defer_block_deps_emit_mode =
+        if options.jit || (defer_resolver_fn.is_some() && defer_blocks.is_empty()) {
+            DeferBlockDepsEmitMode::PerComponent
+        } else {
+            DeferBlockDepsEmitMode::PerBlock
+        };
 
     // Enable debug locations when NOT using advanced optimizations
     // (advanced optimizations strip debug info for smaller output)
@@ -5188,8 +5206,10 @@ fn compile_component_full<'a>(
         enable_debug_locations,
         template_source: if enable_debug_locations { Some(template) } else { None },
         // PerComponent mode: pass the shared resolver expression so the
-        // ingest stage attaches it to every defer block's create op.
+        // ingest stage attaches it to every defer block's create op. PerBlock
+        // mode: the fallback for a block missing from `defer_blocks`.
         all_deferrable_deps_fn: defer_resolver_fn,
+        defer_blocks,
         // Use the shared pool starting index to avoid duplicate constant names
         // when compiling multiple components in the same file
         pool_starting_index,
@@ -5687,6 +5707,7 @@ pub fn compile_template_to_js_with_options<'a>(
         enable_debug_locations,
         template_source: Some(template),
         all_deferrable_deps_fn: None,
+        defer_blocks: FxHashMap::default(),
         pool_starting_index: 0, // Standalone template compilation starts from 0
         angular_version: options.angular_version,
         legacy_optional_chaining: options.legacy_optional_chaining,
@@ -5873,6 +5894,7 @@ pub fn compile_template_for_hmr<'a>(
         enable_debug_locations,
         template_source: Some(template),
         all_deferrable_deps_fn: None,
+        defer_blocks: FxHashMap::default(),
         pool_starting_index: 0, // HMR template compilation starts from 0
         angular_version: options.angular_version,
         legacy_optional_chaining: options.legacy_optional_chaining,
@@ -6601,6 +6623,7 @@ pub fn compile_template_for_linker<'a>(
         enable_debug_locations: false,
         template_source: Some(template),
         all_deferrable_deps_fn: None,
+        defer_blocks: FxHashMap::default(),
         pool_starting_index: 0,
         angular_version,
         // Angular's linker uses native `?.` for declarations at version 22+ (and the
